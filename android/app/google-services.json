@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "846859016038",
+    "project_id": "high-school-a6af7",
+    "storage_bucket": "high-school-a6af7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846859016038:android:69e2a8cb059abc01ca5aa7",
+        "android_client_info": {
+          "package_name": "com.example.suborno_joyonti"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC20wM777Bk6kS_P2OrN81WNvFSifn3B_Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
