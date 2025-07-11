@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'app/modules/registration/views/registration_page.dart';
 import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
@@ -910,7 +911,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
       padding: EdgeInsets.symmetric(
-        vertical: isMobile ? 40.0 : 80.0,
+        vertical: isMobile ? 20.0 : 80.0,
         horizontal: 20,
       ),
       color: const Color(0xFF8B6914),
@@ -930,11 +931,20 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
             // Mobile layout - vertical stack
             Column(
               children: [
-                _buildContactItem(Icons.email, 'info@goldenjubilee.com'),
+                _buildContactItem(
+                  Icons.email,
+                  'jhsgoldenjubilee2026@gmail.com',
+                ),
                 const SizedBox(height: 15),
-                _buildContactItem(Icons.phone, '+1 (555) 123-4567'),
+                _buildContactItem(
+                  Icons.phone,
+                  '০১৮২২৯৯৯৯৭১ (আহবায়ক),\n০১৩০৯১০৭৬৩৬ (প্রধান শিক্ষক),\n০১৭৩৯৪৬৬৮৯০ (সচিব)',
+                ),
                 const SizedBox(height: 15),
-                _buildContactItem(Icons.location_on, '১২৩ উদযাপন এভিনিউ'),
+                _buildContactItem(
+                  Icons.location_on,
+                  'জাহাজমারা উচ্চ বিদ্যালয়,জাহাজমারা,হাতিয়া,নোয়াখালী',
+                ),
               ],
             )
           else
@@ -942,14 +952,24 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildContactItem(Icons.email, 'info@goldenjubilee.com'),
+                _buildContactItem(
+                  Icons.email,
+                  'jhsgoldenjubilee2026@gmail.com',
+                ),
                 const SizedBox(width: 40),
-                _buildContactItem(Icons.phone, '+1 (555) 123-4567'),
+                _buildContactItem(
+                  Icons.phone,
+                  '০১৮২২৯৯৯৯৭১ (আহবায়ক), ০১৩০৯১০৭৬৩৬ (প্রধান শিক্ষক), ০১৭৩৯৪৬৬৮৯০ (সচিব)',
+                ),
                 const SizedBox(width: 40),
-                _buildContactItem(Icons.location_on, '123 Celebration Ave'),
+                _buildContactItem(
+                  Icons.location_on,
+                  'জাহাজমারা উচ্চ বিদ্যালয়,জাহাজমারা,হাতিয়া,নোয়াখালী',
+                ),
               ],
             ),
           SizedBox(height: isMobile ? 20.0 : 40.0),
+          Divider(),
           const Text(
             '© ২০২৪ সুবর্ণজয়ন্তী উদযাপন। সর্বস্বত্ব সংরক্ষিত।',
             style: TextStyle(color: Colors.white70, fontSize: 14),
@@ -961,12 +981,41 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   }
 
   Widget _buildContactItem(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFFD4AF37), size: 24),
-        const SizedBox(width: 10),
-        Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
-      ],
-    );
+    // Special handling for email
+    if (icon == Icons.email) {
+      return Row(
+        children: [
+          Icon(icon, color: const Color(0xFFD4AF37), size: 24),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () async {
+              final uri = Uri(scheme: 'mailto', path: text);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            child: Tooltip(
+              message: 'ক্লিক করুন ইমেইল পাঠাতে বা কপি করতে',
+              child: SelectableText(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  // Removed underline
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Row(
+        children: [
+          Icon(icon, color: const Color(0xFFD4AF37), size: 24),
+          const SizedBox(width: 10),
+          Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        ],
+      );
+    }
   }
 }
