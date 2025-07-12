@@ -550,7 +550,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'নিবন্ধন ফি বেস প্রতিনিধি বরাবর জমা দিতে হবে।',
+                              'নিবন্ধন ফি ব্যাচ প্রতিনিধি বরাবর জমা দিতে হবে।',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFFBF360C),

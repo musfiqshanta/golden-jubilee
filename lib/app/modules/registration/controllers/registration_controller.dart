@@ -398,6 +398,41 @@ class RegistrationController extends GetxController {
       return;
     }
 
+    final isRunning = isRunningStudent.value;
+    final batch =
+        isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
+    final phone = mobileController.text.trim();
+
+    // Check if phone number already exists in the same batch
+    try {
+      final existingDoc =
+          await FirebaseFirestore.instance
+              .collection('batches')
+              .doc(batch)
+              .collection('registrations')
+              .doc(phone)
+              .get();
+
+      if (existingDoc.exists) {
+        Get.snackbar(
+          'ত্রুটি',
+          'এই মোবাইল নম্বরটি ইতিমধ্যে এই ব্যাচে নিবন্ধিত হয়েছে। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন।',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+        return;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন যাচাইকরণে সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
     isLoading.value = true;
     Get.dialog(
       Center(
@@ -474,10 +509,6 @@ class RegistrationController extends GetxController {
       }
     }
 
-    final isRunning = isRunningStudent.value;
-    final batch =
-        isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
-    final phone = mobileController.text.trim();
     final data = _collectRegistrationData(batch);
     if (photoUrl != null) {
       data['photoUrl'] = photoUrl;
@@ -699,7 +730,7 @@ class RegistrationController extends GetxController {
     }
   }
 
-  // Generate Registration PDF - Simple Bengali Version
+  // Generate Registration PDF with proper Bengali support
   Future<void> generateRegistrationPdf() async {
     try {
       if (nameController.text.isEmpty ||
@@ -715,12 +746,12 @@ class RegistrationController extends GetxController {
       }
 
       final pdf = pw.Document();
-      // Always load and use Bengali font
-      final fontData = await rootBundle.load(
-        'assets/fonts/NotoSansBengali-Regular.ttf',
-      );
-      final useFont = pw.Font.ttf(fontData);
-      final useFont2 = pw.Font.ttf(fontData); // Use same for all Bengali text
+
+      // Load Bengali fonts with proper fallback
+      final loadFont = await FontManager.loadFont(GetFonts.ruposhiBangla);
+      final loadFont2 = await FontManager.loadFont(GetFonts.kalpurush);
+      final useFont = pw.Font.ttf(loadFont);
+      final useFont2 = pw.Font.ttf(loadFont2);
 
       // Load logo image
       final logoData = await rootBundle.load('assets/logo.png');
@@ -741,6 +772,19 @@ class RegistrationController extends GetxController {
       int totalGuest = spouseCount.value + childCount.value;
       int participantAmount = isRunningStudent.value ? 700 : 1200;
       totalAmount = participantAmount + (totalGuest * 500);
+
+      // Get the current form serial number (total registrations + 1)
+      int formSerialNumber = 0;
+      try {
+        final totalRegistrations =
+            await FirebaseFirestore.instance
+                .collectionGroup('registrations')
+                .get();
+        formSerialNumber = totalRegistrations.size + 1;
+      } catch (e) {
+        print('Error getting total registrations: $e');
+        formSerialNumber = 1; // Fallback to 1 if error
+      }
 
       pdf.addPage(
         pw.Page(
@@ -776,7 +820,7 @@ class RegistrationController extends GetxController {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text(
-                            'সুবর্ণজয়ন্তী নিবন্ধন',
+                            _safeFix('সুবর্ণজয়ন্তী নিবন্ধন'),
                             style: pw.TextStyle(
                               font: useFont,
                               fontSize: 20,
@@ -784,7 +828,7 @@ class RegistrationController extends GetxController {
                             ),
                           ),
                           pw.Text(
-                            'জাহাজমারা উচ্চ বিদ্যালয়',
+                            _safeFix('জাহাজমারা উচ্চ বিদ্যালয়'),
                             style: pw.TextStyle(font: useFont, fontSize: 14),
                           ),
                         ],
@@ -806,13 +850,14 @@ class RegistrationController extends GetxController {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'রেজিস্ট্রেশন তারিখঃ ${registrationDate.year}-${registrationDate.month.toString().padLeft(2, '0')}-${registrationDate.day.toString().padLeft(2, '0')}'
-                            .fix(),
+                        _safeFix(
+                          'রেজিস্ট্রেশন তারিখঃ ${registrationDate.year}-${registrationDate.month.toString().padLeft(2, '0')}-${registrationDate.day.toString().padLeft(2, '0')}',
+                        ),
                         style: pw.TextStyle(font: useFont, fontSize: 11),
                       ),
 
                       pw.Text(
-                        'https://jahajmarahighschool.com'.fix(),
+                        'https://jahajmarahighschool.com',
                         style: pw.TextStyle(fontSize: 11),
                       ),
                     ],
@@ -840,7 +885,7 @@ class RegistrationController extends GetxController {
                             mainAxisAlignment: pw.MainAxisAlignment.start,
                             children: [
                               pw.Text(
-                                'ব্যক্তিগত তথ্য'.fix(),
+                                _safeFix('ব্যক্তিগত তথ্য'),
                                 style: pw.TextStyle(
                                   font: useFont2,
                                   fontWeight: pw.FontWeight.bold,
@@ -899,9 +944,11 @@ class RegistrationController extends GetxController {
                             mainAxisAlignment: pw.MainAxisAlignment.start,
                             children: [
                               pw.Text(
-                                isRunningStudent.value
-                                    ? 'শিক্ষাগত তথ্য (বর্তমানে অধ্যয়নরত)'.fix()
-                                    : 'শিক্ষাগত তথ্য (প্রাক্তন ছাএ)'.fix(),
+                                _safeFix(
+                                  isRunningStudent.value
+                                      ? 'শিক্ষাগত তথ্য (বর্তমানে অধ্যয়নরত)'
+                                      : 'শিক্ষাগত তথ্য (প্রাক্তন ছাএ)',
+                                ),
                                 style: pw.TextStyle(
                                   font: useFont2,
                                   fontWeight: pw.FontWeight.bold,
@@ -948,7 +995,7 @@ class RegistrationController extends GetxController {
                             mainAxisAlignment: pw.MainAxisAlignment.start,
                             children: [
                               pw.Text(
-                                'যোগাযোগের তথ্য'.fix(),
+                                _safeFix('যোগাযোগের তথ্য'),
                                 style: pw.TextStyle(
                                   font: useFont2,
                                   fontWeight: pw.FontWeight.bold,
@@ -991,7 +1038,7 @@ class RegistrationController extends GetxController {
                             mainAxisAlignment: pw.MainAxisAlignment.center,
                             children: [
                               pw.Text(
-                                'অতিরিক্ত তথ্য'.fix(),
+                                _safeFix('অতিরিক্ত তথ্য'),
                                 style: pw.TextStyle(
                                   font: useFont2,
                                   fontWeight: pw.FontWeight.bold,
@@ -1069,7 +1116,7 @@ class RegistrationController extends GetxController {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'প্রাপ্তি স্বীকারপত্র'.fix(),
+                        _safeFix('প্রাপ্তি স্বীকারপত্র'),
                         style: pw.TextStyle(
                           font: useFont2,
                           fontWeight: pw.FontWeight.bold,
@@ -1081,7 +1128,11 @@ class RegistrationController extends GetxController {
                       pw.SizedBox(height: 6),
                       pw.Divider(color: PdfColors.amber300, thickness: 0.8),
                       pw.SizedBox(height: 8),
-                      _ackLine('ফর্ম ক্রমিক নং', '', useFont2),
+                      _ackLine(
+                        'ফর্ম ক্রমিক নং',
+                        formSerialNumber.toString(),
+                        useFont2,
+                      ),
                       _ackLine('নাম:', nameController.text, useFont2),
                       ...[
                         if (isRunningStudent.value)
@@ -1098,7 +1149,7 @@ class RegistrationController extends GetxController {
                           ),
                       ],
                       _ackLine(
-                        'পিতা/স্বামীর নাম:',
+                        'পিতার নাম:',
                         fatherNameController.text,
                         useFont2,
                       ),
@@ -1127,7 +1178,7 @@ class RegistrationController extends GetxController {
                           margin: pw.EdgeInsets.only(bottom: 4),
                         ),
                         pw.Text(
-                          'হিসাবরক্ষক'.fix(),
+                          _safeFix('হিসাবরক্ষক'),
                           style: pw.TextStyle(font: useFont2, fontSize: 12),
                         ),
                       ],
@@ -1142,7 +1193,7 @@ class RegistrationController extends GetxController {
                           margin: pw.EdgeInsets.only(bottom: 4),
                         ),
                         pw.Text(
-                          'আবেদনকারী'.fix(),
+                          _safeFix('আবেদনকারী'),
                           style: pw.TextStyle(font: useFont2, fontSize: 12),
                         ),
                       ],
@@ -1154,7 +1205,7 @@ class RegistrationController extends GetxController {
                 pw.Container(
                   alignment: pw.Alignment.center,
                   child: pw.Text(
-                    'সুবর্ণজয়ন্তী - জাহাজমারা উচ্চ বিদ্যালয় '.fix(),
+                    _safeFix('সুবর্ণজয়ন্তী - জাহাজমারা উচ্চ বিদ্যালয় '),
                     style: pw.TextStyle(
                       font: useFont,
                       fontSize: 10,
@@ -1275,8 +1326,14 @@ class RegistrationController extends GetxController {
 
   // Safe fix method to handle potential errors
   String _safeFix(String text) {
-    // Simply return the original text since we're not using bangla_pdf_fixer anymore
-    return text;
+    try {
+      // Use bangla_pdf_fixer to properly handle Bengali text
+      return text.fix();
+    } catch (e) {
+      print('Warning: bangla_pdf_fixer failed for text: $text, error: $e');
+      // Fallback to original text if fix() fails
+      return text;
+    }
   }
 
   // Test Bengali PDF generation method
