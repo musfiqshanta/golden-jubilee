@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'dart:html' if (dart.library.io) 'dart:io' as html;
+import 'package:suborno_joyonti/app/services/pdf_service.dart';
 
 class RegistrationController extends GetxController {
   // Form controllers
@@ -500,7 +501,7 @@ class RegistrationController extends GetxController {
         Get.back(); // Dismiss loading
         Get.snackbar(
           'ছবি আপলোড ব্যর্থ',
-          'ত্রুটি: $e',
+          'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
           backgroundColor: Colors.redAccent,
           colorText: Colors.white,
         );
@@ -509,10 +510,26 @@ class RegistrationController extends GetxController {
       }
     }
 
+    // Now run the Firestore transaction for the serial number and save registration
     final data = _collectRegistrationData(batch);
     if (photoUrl != null) {
       data['photoUrl'] = photoUrl;
     }
+    final counterRef = FirebaseFirestore.instance
+        .collection('counters')
+        .doc('registration');
+    int formSerialNumber = 1;
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(counterRef);
+      if (snapshot.exists) {
+        formSerialNumber = (snapshot.data()?['value'] ?? 0) + 1;
+        transaction.update(counterRef, {'value': formSerialNumber});
+      } else {
+        transaction.set(counterRef, {'value': 1});
+        formSerialNumber = 1;
+      }
+    });
+    data['formSerialNumber'] = formSerialNumber;
     await FirebaseFirestore.instance
         .collection('batches')
         .doc(batch)
@@ -520,10 +537,23 @@ class RegistrationController extends GetxController {
         .doc(phone)
         .set(data)
         .then((value) async {
+          // Fetch the saved registration document to get the correct formSerialNumber
+          final doc =
+              await FirebaseFirestore.instance
+                  .collection('batches')
+                  .doc(batch)
+                  .collection('registrations')
+                  .doc(phone)
+                  .get();
           Get.back(); // Dismiss loading
           // Only call PDF generation (dialog will be shown inside that method)
           try {
-            await generateRegistrationPdf();
+            if (doc.exists) {
+              final registrationData = doc.data() ?? <String, dynamic>{};
+              await PdfService.generateRegistrationPdfFromData(
+                registrationData,
+              );
+            }
           } catch (e) {
             print('PDF generation error: $e');
             Get.snackbar(

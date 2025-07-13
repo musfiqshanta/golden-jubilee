@@ -58,25 +58,28 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   ),
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.auto_fix_high, size: 18),
-                          label: const Text(
-                            'ডেমো ডাটা পূরণ করুন',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueGrey.shade100,
-                            foregroundColor: Colors.black87,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.auto_fix_high, size: 18),
+                            label: const Text(
+                              'ডেমো ডাটা পূরণ করুন',
+                              style: TextStyle(fontSize: 12),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueGrey.shade100,
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
+                            onPressed: controller.fillDemoData,
                           ),
-                          onPressed: controller.fillDemoData,
                         ),
                       ],
                     ),
@@ -672,40 +675,47 @@ class RegistrationPage extends GetView<RegistrationController> {
                 ]),
                 const SizedBox(height: 30),
                 // Submit Button
-                ElevatedButton(
-                  onPressed: () async {
-                    if (controller.formKey.currentState!.validate() &&
-                        controller.selectedTshirtSize.value != null &&
-                        controller.selectedPhoto.value != null) {
-                      await controller.saveRegistration();
-                    } else if (controller.selectedTshirtSize.value == null) {
-                      Get.snackbar(
-                        'ত্রুটি',
-                        'টি-শার্ট সাইজ নির্বাচন করুন',
-                        backgroundColor: Colors.redAccent,
-                        colorText: Colors.white,
-                      );
-                    } else if (controller.selectedPhoto.value == null) {
-                      controller.photoError.value = 'ছবি আপলোড করা বাধ্যতামূলক';
-                      Get.snackbar(
-                        'ত্রুটি',
-                        'ছবি আপলোড করা বাধ্যতামূলক',
-                        backgroundColor: Colors.redAccent,
-                        colorText: Colors.white,
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (controller.formKey.currentState!.validate() &&
+                          controller.selectedTshirtSize.value != null &&
+                          controller.selectedPhoto.value != null) {
+                        await controller.saveRegistration();
+                      } else if (controller.selectedTshirtSize.value == null) {
+                        Get.snackbar(
+                          'ত্রুটি',
+                          'টি-শার্ট সাইজ নির্বাচন করুন',
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      } else if (controller.selectedPhoto.value == null) {
+                        controller.photoError.value =
+                            'ছবি আপলোড করা বাধ্যতামূলক';
+                        Get.snackbar(
+                          'ত্রুটি',
+                          'ছবি আপলোড করা বাধ্যতামূলক',
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'নিবন্ধন জমা দিন',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    child: const Text(
+                      'নিবন্ধন জমা দিন',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -813,27 +823,30 @@ class RegistrationPage extends GetView<RegistrationController> {
     required DateTime? value,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)),
-            const SizedBox(width: 12),
-            Text(
-              value != null
-                  ? '${value.day}/${value.month}/${value.year}'
-                  : 'জন্ম তারিখ নির্বাচন করুন',
-              style: TextStyle(
-                color: value != null ? Colors.black : Colors.grey,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)),
+              const SizedBox(width: 12),
+              Text(
+                value != null
+                    ? '${value.day}/${value.month}/${value.year}'
+                    : 'জন্ম তারিখ নির্বাচন করুন',
+                style: TextStyle(
+                  color: value != null ? Colors.black : Colors.grey,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

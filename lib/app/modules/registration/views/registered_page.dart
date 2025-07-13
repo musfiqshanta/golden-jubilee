@@ -12,7 +12,7 @@ class RegisteredPage extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text(
-            'Registered Batches',
+            'নিবন্ধিত ব্যাচসমূহ',
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: const Color(0xFFD4AF37),
@@ -91,31 +91,125 @@ class RegisteredPage extends StatelessWidget {
                         for (var classId in runningClassBatches) {
                           totalRunning += batchMap[classId]?.length ?? 0;
                         }
-                        return GestureDetector(
-                          onTap: () {
-                            Get.to(
-                              () => RunningBatchPage(
-                                runningClassBatches: runningClassBatches,
-                                batchMap: batchMap,
+                        return MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              Get.to(
+                                () => RunningBatchPage(
+                                  runningClassBatches: runningClassBatches,
+                                  batchMap: batchMap,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF145A32), // Deep Green
+                                    Color(0xFFFFD700), // Golden
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
                               ),
-                            );
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'বর্তমানে অধ্যয়নরত',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 1.2,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black26,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.people,
+                                          color: Colors.white,
+                                          size: 15,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          '$totalRunning',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.black26,
+                                                blurRadius: 2,
+                                                offset: Offset(0, 1),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      // Normal batch card
+                      final regCount = batchMap[batchId]?.length ?? 0;
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {
+                            Get.to(() => BatchDetailsPage(batchId: batchId));
                           },
                           child: Container(
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF145A32), // Deep Green
-                                  Color(0xFFFFD700), // Golden
-                                ],
+                                colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
+                                  color: Colors.black.withOpacity(0.10),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
@@ -128,20 +222,13 @@ class RegisteredPage extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'Running Batch',
-                                  style: TextStyle(
-                                    fontSize: 15,
+                                Text(
+                                  'ব্যাচ $batchId',
+                                  style: const TextStyle(
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
-                                    letterSpacing: 1.2,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black26,
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
+                                    letterSpacing: 1.1,
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -160,22 +247,15 @@ class RegisteredPage extends StatelessWidget {
                                       const Icon(
                                         Icons.people,
                                         color: Colors.white,
-                                        size: 15,
+                                        size: 13,
                                       ),
                                       const SizedBox(width: 2),
                                       Text(
-                                        '$totalRunning',
+                                        '$regCount',
                                         style: const TextStyle(
-                                          fontSize: 13,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
-                                          shadows: [
-                                            Shadow(
-                                              color: Colors.black26,
-                                              blurRadius: 2,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
                                         ),
                                       ),
                                     ],
@@ -183,80 +263,6 @@ class RegisteredPage extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          ),
-                        );
-                      }
-                      // Normal batch card
-                      final regCount = batchMap[batchId]?.length ?? 0;
-                      return GestureDetector(
-                        onTap: () {
-                          Get.to(() => BatchDetailsPage(batchId: batchId));
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.10),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 6),
-                              Text(
-                                'Batch $batchId',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.people,
-                                      color: Colors.white,
-                                      size: 13,
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '$regCount',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                           ),
                         ),
                       );
@@ -286,7 +292,7 @@ class BatchDetailsPage extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'Batch $batchId Registrations',
+            'ব্যাচ $batchId নিবন্ধনসমূহ',
             style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: const Color(0xFFD4AF37),
@@ -385,7 +391,7 @@ class RunningBatchPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Running Batch Classes',
+          'বর্তমানে অধ্যয়নরত শ্রেণিসমূহ',
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: const Color(0xFFD4AF37),
@@ -415,75 +421,78 @@ class RunningBatchPage extends StatelessWidget {
               itemBuilder: (context, index) {
                 final classId = sortedClasses[index];
                 final regCount = batchMap[classId]?.length ?? 0;
-                return GestureDetector(
-                  onTap: () {
-                    Get.to(() => BatchDetailsPage(batchId: classId));
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      Get.to(() => BatchDetailsPage(batchId: classId));
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.10),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.10),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 6),
-                        Text(
-                          classId,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.1,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 6),
+                          Text(
+                            classId,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.people,
-                                color: Colors.white,
-                                size: 13,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                '$regCount',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.people,
                                   color: Colors.white,
+                                  size: 13,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 2),
+                                Text(
+                                  '$regCount',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );

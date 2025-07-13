@@ -9,6 +9,7 @@ import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app/modules/registration/views/registered_page.dart';
+import 'app/modules/registration/views/check_registration_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +43,10 @@ class GoldenJubileeApp extends StatelessWidget {
           binding: RegistrationBinding(),
         ),
         GetPage(name: '/registered', page: () => RegisteredPage()),
+        GetPage(
+          name: '/check-registration',
+          page: () => CheckRegistrationPage(),
+        ),
       ],
     );
   }
@@ -261,25 +266,64 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 // Calendar-style Countdown (white background, golden text)
                 _buildCalendarCountdownRow(days, hours, minutes, seconds, true),
                 const SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: () {
-                    Get.toNamed('/registration');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFFD4AF37),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 15,
+                // Buttons Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.toNamed('/registration');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFFD4AF37),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'নিবন্ধন করুন',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                    const SizedBox(width: 20),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.toNamed('/check-registration');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8B6914),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'নিবন্ধন যাচাই করুন',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'নিবন্ধন করুন',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 30),
                 // Total Registration Display (Styled, with live count)
@@ -288,78 +332,84 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                     final isMobile = constraints.maxWidth < 500;
                     final children = [
                       // মোট নিবন্ধন
-                      GestureDetector(
-                        onTap: () {
-                          print('Total registration tapped');
-                          Get.toNamed('/registered');
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 30,
-                            vertical: 15,
-                          ),
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(25),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
+                      Tooltip(
+                        message: 'নিবন্ধিত ব্যক্তিদের তালিকা দেখুন',
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              print('Total registration tapped');
+                              Get.toNamed('/registered');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 30,
+                                vertical: 15,
+                              ),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.people,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    'মোট নিবন্ধন: ',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width:
+                                        48, // enough for spinner or 4-digit number
+                                    child: StreamBuilder<QuerySnapshot>(
+                                      stream:
+                                          FirebaseFirestore.instance
+                                              .collectionGroup('registrations')
+                                              .snapshots(),
+                                      builder: (context, snapshot) {
+                                        if (!snapshot.hasData) {
+                                          return const Text(
+                                            '0',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          );
+                                        }
+                                        final total = snapshot.data!.size;
+                                        return Text(
+                                          '$total',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.people,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                'মোট নিবন্ধন: ',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(
-                                width:
-                                    48, // enough for spinner or 4-digit number
-                                child: StreamBuilder<QuerySnapshot>(
-                                  stream:
-                                      FirebaseFirestore.instance
-                                          .collectionGroup('registrations')
-                                          .snapshots(),
-                                  builder: (context, snapshot) {
-                                    if (!snapshot.hasData) {
-                                      return const Text(
-                                        '0',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      );
-                                    }
-                                    final total = snapshot.data!.size;
-                                    return Text(
-                                      '$total',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -741,65 +791,83 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     IconData icon,
     String date,
   ) {
-    return Container(
-      width: MediaQuery.of(context).size.width > 600 ? 300 : 280,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4AF37),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: Colors.white, size: 24),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          // You can add navigation or show details here
+          Get.snackbar(
+            title,
+            description,
+            backgroundColor: const Color(0xFFD4AF37),
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
+        },
+        child: Container(
+          width: MediaQuery.of(context).size.width > 600 ? 300 : 280,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8B6914),
-                      ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    Text(
-                      date,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    child: Icon(icon, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF8B6914),
+                          ),
+                        ),
+                        Text(
+                          date,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  height: 1.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 15),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.5,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -986,21 +1054,24 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
         children: [
           Icon(icon, color: const Color(0xFFD4AF37), size: 24),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () async {
-              final uri = Uri(scheme: 'mailto', path: text);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri);
-              }
-            },
-            child: Tooltip(
-              message: 'ক্লিক করুন ইমেইল পাঠাতে বা কপি করতে',
-              child: SelectableText(
-                text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  // Removed underline
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () async {
+                final uri = Uri(scheme: 'mailto', path: text);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              child: Tooltip(
+                message: 'ক্লিক করুন ইমেইল পাঠাতে বা কপি করতে',
+                child: SelectableText(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    // Removed underline
+                  ),
                 ),
               ),
             ),
