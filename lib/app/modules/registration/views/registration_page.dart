@@ -245,7 +245,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                 ]),
                 const SizedBox(height: 20),
                 // Contact Information Section
-                _sectionCard('যোগাযোগের তথ্য', Icons.contact_phone, [
+                _sectionCard('যোগাযোগের তথ্য (ইংলিশ)', Icons.contact_phone, [
                   _textField(
                     controller: controller.mobileController,
                     label: 'মোবাইল নম্বর',

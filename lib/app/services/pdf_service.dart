@@ -8,7 +8,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart';
 import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,8 +15,9 @@ class PdfService {
   // Remove static font fields and manual font loading
 
   static Future<void> generateRegistrationPdfFromData(
-    Map<String, dynamic> data,
-  ) async {
+    Map<String, dynamic> data, {
+    VoidCallback? onBeforeOpen,
+  }) async {
     try {
       // Load Bengali fonts using bangla_pdf_fixer
       final loadFont = await FontManager.loadFont(GetFonts.ruposhiBangla);
@@ -212,7 +212,7 @@ class PdfService {
                               ),
                               _twoLineField(
                                 'জন্ম তারিখঃ',
-                                (data['dateOfBirth'] ?? '').toString(),
+                                _formatDateOfBirth(data['dateOfBirth']),
                                 useFont2,
                                 useFont,
                               ),
@@ -507,10 +507,10 @@ class PdfService {
         final pdfBytes = await pdf.save();
         final blob = html.Blob([pdfBytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor =
-            html.AnchorElement(href: url)
-              ..setAttribute('download', 'registration_${data['mobile']}.pdf')
-              ..click();
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', 'registration_${data['mobile']}.pdf');
+        if (onBeforeOpen != null) onBeforeOpen();
+        anchor.click();
         html.Url.revokeObjectUrl(url);
         Get.snackbar(
           'সফল',
@@ -523,6 +523,7 @@ class PdfService {
         final filePath = '${outputDir.path}/registration_${data['mobile']}.pdf';
         final file = File(filePath);
         await file.writeAsBytes(await pdf.save());
+        if (onBeforeOpen != null) onBeforeOpen();
         await OpenFile.open(filePath);
         Get.snackbar(
           'সফল',
@@ -621,5 +622,16 @@ class PdfService {
         ),
       ],
     );
+  }
+
+  static String _formatDateOfBirth(dynamic date) {
+    if (date == null) return '';
+    String dateString = date.toString();
+    try {
+      final parsed = DateTime.parse(dateString);
+      return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 }

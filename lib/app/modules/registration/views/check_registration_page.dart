@@ -630,25 +630,23 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
           const SizedBox(height: 15),
           if (photoUrl != null && photoUrl.isNotEmpty)
             Center(
-              child: ClipOval(
-                child: Image.network(
-                  photoUrl,
-                  width: 90,
-                  height: 90,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 90,
-                      height: 90,
-                      color: Colors.grey.shade200,
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.grey,
-                      ),
-                    );
-                  },
-                ),
+              child: Image.network(
+                photoUrl,
+                width: 90,
+                height: 90,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 90,
+                    height: 90,
+                    color: Colors.grey.shade200,
+                    child: const Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
+                  );
+                },
               ),
             )
           else

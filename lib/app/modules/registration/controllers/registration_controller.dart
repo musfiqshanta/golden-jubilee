@@ -530,45 +530,48 @@ class RegistrationController extends GetxController {
       }
     });
     data['formSerialNumber'] = formSerialNumber;
-    await FirebaseFirestore.instance
-        .collection('batches')
-        .doc(batch)
-        .collection('registrations')
-        .doc(phone)
-        .set(data)
-        .then((value) async {
-          // Fetch the saved registration document to get the correct formSerialNumber
-          final doc =
-              await FirebaseFirestore.instance
-                  .collection('batches')
-                  .doc(batch)
-                  .collection('registrations')
-                  .doc(phone)
-                  .get();
-          Get.back(); // Dismiss loading
-          // Only call PDF generation (dialog will be shown inside that method)
-          try {
-            if (doc.exists) {
-              final registrationData = doc.data() ?? <String, dynamic>{};
-              await PdfService.generateRegistrationPdfFromData(
-                registrationData,
-              );
-            }
-          } catch (e) {
-            print('PDF generation error: $e');
-            Get.snackbar(
-              'সতর্কতা',
-              'নিবন্ধন সফল হয়েছে কিন্তু পিডিএফ তৈরি করতে সমস্যা হয়েছে',
-              backgroundColor: Colors.orange,
-              colorText: Colors.white,
-            );
-          }
-          clearForm();
-        })
-        .catchError((error) {
-          Get.back(); // Dismiss loading
-          Get.snackbar('Error', 'Registration failed: $error');
-        });
+    try {
+      await FirebaseFirestore.instance
+          .collection('batches')
+          .doc(batch)
+          .collection('registrations')
+          .doc(phone)
+          .set(data);
+
+      // Fetch the saved registration document to get the correct formSerialNumber
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('batches')
+              .doc(batch)
+              .collection('registrations')
+              .doc(phone)
+              .get();
+
+      // Only call PDF generation (dialog will be shown inside that method)
+      try {
+        if (doc.exists) {
+          final registrationData = doc.data() ?? <String, dynamic>{};
+          await PdfService.generateRegistrationPdfFromData(
+            registrationData,
+            onBeforeOpen: () {
+              if (Get.isDialogOpen ?? false) Get.back();
+            },
+          );
+        }
+      } catch (e) {
+        print('PDF generation error: $e');
+        Get.snackbar(
+          'সতর্কতা',
+          'নিবন্ধন সফল হয়েছে কিন্তু পিডিএফ তৈরি করতে সমস্যা হয়েছে',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+      clearForm();
+    } catch (error) {
+      Get.back(); // Dismiss loading on error
+      Get.snackbar('Error', 'Registration failed: $error');
+    }
     isLoading.value = false;
   }
 
