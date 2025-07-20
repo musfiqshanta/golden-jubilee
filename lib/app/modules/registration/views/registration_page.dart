@@ -435,39 +435,33 @@ class RegistrationPage extends GetView<RegistrationController> {
                 ]),
                 const SizedBox(height: 20),
                 // Family Participation Section
-                _sectionCard(
-                  'পরিবারের অংশগ্রহণ (সর্বোচ্চ ২ জন)',
-                  Icons.family_restroom,
-                  [
-                    Obx(
-                      () => Row(
-                        children: [
-                          Expanded(
-                            child: _customNumberField(
-                              label: 'অংশগ্রহণকারী স্বামী/স্ত্রী',
-                              value: controller.spouseCount.value,
-                              max: 4,
-                              onChanged:
-                                  (value) =>
-                                      controller.spouseCount.value = value,
-                            ),
+                _sectionCard('পরিবার/অতিথী অংশগ্রহণ ', Icons.family_restroom, [
+                  Obx(
+                    () => Row(
+                      children: [
+                        Expanded(
+                          child: _customNumberField(
+                            label: 'স্বামী/স্ত্রী/সন্তান',
+                            value: controller.spouseCount.value,
+
+                            onChanged:
+                                (value) => controller.spouseCount.value = value,
                           ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: _customNumberField(
-                              label: 'সন্তান',
-                              value: controller.childCount.value,
-                              max: 3,
-                              onChanged:
-                                  (value) =>
-                                      controller.childCount.value = value,
-                            ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _customNumberField(
+                            label: 'অন্যান্য আতিথী',
+                            value: controller.childCount.value,
+
+                            onChanged:
+                                (value) => controller.childCount.value = value,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ]),
                 const SizedBox(height: 20),
                 // T-shirt Size Dropdown
                 _sectionCard('টি-শার্টের সাইজ', Icons.checkroom, [
@@ -855,7 +849,7 @@ class RegistrationPage extends GetView<RegistrationController> {
   Widget _customNumberField({
     required String label,
     required int value,
-    required int max,
+
     required void Function(int) onChanged,
   }) {
     return Column(
@@ -893,7 +887,7 @@ class RegistrationPage extends GetView<RegistrationController> {
               ),
             ),
             IconButton(
-              onPressed: value < max ? () => onChanged(value + 1) : null,
+              onPressed: () => onChanged(value + 1),
               icon: const Icon(Icons.add_circle_outline),
               color: const Color(0xFFD4AF37),
             ),

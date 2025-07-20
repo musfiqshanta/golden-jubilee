@@ -57,6 +57,7 @@ dependencies:
   # HTTP and path utilities
   http: ^1.1.0
   path: ^1.8.3
+  firebase_auth: ^5.6.2
 
 dev_dependencies:
   flutter_test:

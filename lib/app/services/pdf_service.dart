@@ -426,7 +426,7 @@ class PdfService {
                           (data['finalClass'] ?? '').toString(),
                           useFont,
                         )
-                      else
+                      else 
                         _ackLine(
                           'এসএসসি ব্যাচঃ',
                           (data['sscPassingYear'] ?? '').toString(),
@@ -443,12 +443,11 @@ class PdfService {
                         useFont,
                       ),
                       _ackLine('অতিথীঃ', totalGuest.toString(), useFont2),
-                      _ackLine('মোট টাকাঃ', totalAmount.toString(), useFont2),
                       _ackLineEng(
                         'Tshirt Size:',
                         (data['tshirtSize'] ?? '').toString(),
-                        useFont2,
                       ),
+                      _ackLine('মোট টাকাঃ', totalAmount.toString(), useFont2),
                     ],
                   ),
                 ),
@@ -608,7 +607,7 @@ class PdfService {
     );
   }
 
-  static pw.Widget _ackLineEng(String label, String value, pw.Font font) {
+  static pw.Widget _ackLineEng(String label, String value) {
     return pw.Row(
       children: [
         pw.SizedBox(

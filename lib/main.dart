@@ -10,10 +10,22 @@ import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app/modules/registration/views/registered_page.dart';
 import 'app/modules/registration/views/check_registration_page.dart';
+import 'admin_panel/screens/login_screen.dart';
+import 'admin_panel/screens/dashboard_screen.dart';
+
+import 'admin_panel/screens/payments_screen.dart';
+import 'admin_panel/screens/donations_screen.dart';
+import 'admin_panel/screens/add_donation_screen.dart';
+import 'admin_panel/screens/edit_donation_screen.dart';
+import 'admin_panel/screens/search_user_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Configure GetX for clean URLs
+  Get.config(defaultTransition: Transition.noTransition, enableLog: true);
+
   runApp(const GoldenJubileeApp());
 }
 
@@ -36,7 +48,17 @@ class GoldenJubileeApp extends StatelessWidget {
       initialBinding: RegistrationBinding(),
       home: const GoldenJubileeHomePage(),
       debugShowCheckedModeBanner: false,
+      // Enable clean URLs without hash
+      defaultTransition: Transition.noTransition,
+      routingCallback: (routing) {
+        if (routing?.current != null) {
+          print('Current route: ${routing!.current}');
+        }
+      },
+      // Configure for clean URLs
+      initialRoute: '/',
       getPages: [
+        GetPage(name: '/', page: () => const GoldenJubileeHomePage()),
         GetPage(
           name: '/registration',
           page: () => RegistrationPage(),
@@ -46,6 +68,23 @@ class GoldenJubileeApp extends StatelessWidget {
         GetPage(
           name: '/check-registration',
           page: () => CheckRegistrationPage(),
+        ),
+        // Admin panel routes
+        GetPage(name: '/admin', page: () => const LoginScreen()),
+        GetPage(name: '/admin/dashboard', page: () => const DashboardScreen()),
+        GetPage(name: '/admin/payments', page: () => const PaymentsScreen()),
+        GetPage(name: '/admin/donations', page: () => const DonationsScreen()),
+        GetPage(
+          name: '/admin/add-donation',
+          page: () => const AddDonationScreen(),
+        ),
+        GetPage(
+          name: '/admin/edit-donation',
+          page: () => const EditDonationScreen(),
+        ),
+        GetPage(
+          name: '/admin/search-user',
+          page: () => const SearchUserScreen(),
         ),
       ],
     );
@@ -232,7 +271,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  'সুবর্ণজয়ন্তী',
+                  'সুবর্ণ জয়ন্তী',
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width > 600 ? 64 : 48,
                     fontWeight: FontWeight.bold,
@@ -267,63 +306,125 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 _buildCalendarCountdownRow(days, hours, minutes, seconds, true),
                 const SizedBox(height: 30),
                 // Buttons Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Get.toNamed('/registration');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFFD4AF37),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 15,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isVerySmall = constraints.maxWidth < 400;
+                    final isMobile = constraints.maxWidth < 500;
+                    final buttonPadding =
+                        isMobile
+                            ? const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
+                            )
+                            : const EdgeInsets.symmetric(
+                              horizontal: 40,
+                              vertical: 15,
+                            );
+                    final buttonFontSize = isMobile ? 16.0 : 20.0;
+                    if (isVerySmall) {
+                      // Stack vertically for very small screens
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              Get.toNamed('/registration');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFFD4AF37),
+                              padding: buttonPadding,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              'নিবন্ধন করুন',
+                              style: TextStyle(
+                                fontSize: buttonFontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              Get.toNamed('/check-registration');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B6914),
+                              foregroundColor: Colors.white,
+                              padding: buttonPadding,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              'নিবন্ধন যাচাই করুন',
+                              style: TextStyle(
+                                fontSize: buttonFontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'নিবন্ধন করুন',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        ],
+                      );
+                    } else {
+                      // Use Row with Expanded for normal screens
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Get.toNamed('/registration');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFFD4AF37),
+                                padding: buttonPadding,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: Text(
+                                'নিবন্ধন করুন',
+                                style: TextStyle(
+                                  fontSize: buttonFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Get.toNamed('/check-registration');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B6914),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 15,
+                          const SizedBox(width: 20),
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Get.toNamed('/check-registration');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B6914),
+                                foregroundColor: Colors.white,
+                                padding: buttonPadding,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: Text(
+                                'নিবন্ধন যাচাই করুন',
+                                style: TextStyle(
+                                  fontSize: buttonFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: const Text(
-                          'নিবন্ধন যাচাই করুন',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                        ],
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 30),
                 // Total Registration Display (Styled, with live count)
@@ -432,14 +533,14 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(
+                          children: [
+                            const Icon(
                               Icons.attach_money,
                               color: Colors.white,
                               size: 24,
                             ),
-                            SizedBox(width: 10),
-                            Text(
+                            const SizedBox(width: 10),
+                            const Text(
                               'মোট সংগ্রহ: ',
                               style: TextStyle(
                                 color: Colors.white,
@@ -447,12 +548,37 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            Text(
-                              '0',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                            SizedBox(
+                              width: 70,
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream:
+                                    FirebaseFirestore.instance
+                                        .collectionGroup('registrations')
+                                        .where(
+                                          'paymentStatus',
+                                          isEqualTo: 'approved',
+                                        )
+                                        .snapshots(),
+                                builder: (context, snapshot) {
+                                  double totalCollection = 0;
+                                  if (snapshot.hasData) {
+                                    for (var doc in snapshot.data!.docs) {
+                                      final data =
+                                          doc.data() as Map<String, dynamic>;
+                                      totalCollection +=
+                                          (data['totalPayable'] ?? 0) as num;
+                                    }
+                                  }
+                                  return Text(
+                                    '৳$totalCollection',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  );
+                                },
                               ),
                             ),
                           ],
@@ -477,14 +603,14 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(
+                          children: [
+                            const Icon(
                               Icons.volunteer_activism,
                               color: Colors.white,
                               size: 24,
                             ),
-                            SizedBox(width: 10),
-                            Text(
+                            const SizedBox(width: 10),
+                            const Text(
                               'মোট অনুদান: ',
                               style: TextStyle(
                                 color: Colors.white,
@@ -492,12 +618,33 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            Text(
-                              '0',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                            SizedBox(
+                              width: 70,
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream:
+                                    FirebaseFirestore.instance
+                                        .collection('donations')
+                                        .snapshots(),
+                                builder: (context, snapshot) {
+                                  double totalDonation = 0;
+                                  if (snapshot.hasData) {
+                                    for (var doc in snapshot.data!.docs) {
+                                      final data =
+                                          doc.data() as Map<String, dynamic>;
+                                      totalDonation +=
+                                          (data['amount'] ?? 0) as num;
+                                    }
+                                  }
+                                  return Text(
+                                    '৳$totalDonation',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  );
+                                },
                               ),
                             ),
                           ],

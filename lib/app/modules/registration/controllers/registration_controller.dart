@@ -576,6 +576,13 @@ class RegistrationController extends GetxController {
   }
 
   Map<String, dynamic> _collectRegistrationData(String batch) {
+    // Calculate total payable amount
+    final bool isRunning = isRunningStudent.value;
+    final int baseFee = isRunning ? 700 : 1200;
+    final int guestCount = spouseCount.value + childCount.value;
+    final int guestFee = guestCount * 500;
+    final int totalPayable = baseFee + guestFee;
+
     return {
       'name': nameController.text.trim(),
       'fatherName': fatherNameController.text.trim(),
@@ -602,6 +609,8 @@ class RegistrationController extends GetxController {
       'tshirtSize': selectedTshirtSize.value,
       'batch': batch,
       'registrationTimestamp': DateTime.now().toIso8601String(),
+      'totalPayable': totalPayable,
+      'paymentStatus': 'pending',
     };
   }
 

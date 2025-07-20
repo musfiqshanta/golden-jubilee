@@ -70,8 +70,12 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     finalClassController = TextEditingController(text: d['finalClass'] ?? '');
     yearController = TextEditingController(text: d['year'] ?? '');
     gender = d['gender'] ?? 'পুরুষ';
-    nationality = (d['nationality'] == 'Other') ? 'অন্যান্য' : (d['nationality'] ?? 'বাংলাদেশী');
-    religion = (d['religion'] == 'Other') ? 'অন্যান্য' : (d['religion'] ?? 'ইসলাম');
+    nationality =
+        (d['nationality'] == 'Other')
+            ? 'অন্যান্য'
+            : (d['nationality'] ?? 'বাংলাদেশী');
+    religion =
+        (d['religion'] == 'Other') ? 'অন্যান্য' : (d['religion'] ?? 'ইসলাম');
     isRunningStudent = d['isRunningStudent'] == true;
   }
 
@@ -99,6 +103,14 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => isLoading = true);
     try {
+      // Calculate total payable amount
+      final int baseFee = isRunningStudent ? 700 : 1200;
+      final int guestCount =
+          (int.tryParse(spouseCountController.text) ?? 0) +
+          (int.tryParse(childCountController.text) ?? 0);
+      final int guestFee = guestCount * 500;
+      final int totalPayable = baseFee + guestFee;
+
       final data = {
         'name': nameController.text.trim(),
         'fatherName': fatherNameController.text.trim(),
@@ -120,6 +132,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'religion': religion,
         'isRunningStudent': isRunningStudent,
         'batch': widget.batchId,
+        'totalPayable': totalPayable,
         // Keep other fields as is if needed
       };
       await FirebaseFirestore.instance
