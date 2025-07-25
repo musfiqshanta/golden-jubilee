@@ -192,10 +192,12 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value?.isEmpty == true) return 'Amount is required';
-                  if (double.tryParse(value!) == null)
+                  if (double.tryParse(value!) == null) {
                     return 'Please enter a valid amount';
-                  if (double.parse(value) <= 0)
+                  }
+                  if (double.parse(value) <= 0) {
                     return 'Amount must be greater than 0';
+                  }
                   return null;
                 },
               ),
