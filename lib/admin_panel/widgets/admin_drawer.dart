@@ -39,6 +39,13 @@ class AdminDrawer extends StatelessWidget {
             '/admin/search-user',
             Icons.search,
           ),
+          const Divider(),
+          _buildNavItem(
+            context,
+            'Countdown Settings',
+            '/admin/countdown-settings',
+            Icons.timer,
+          ),
         ],
       ),
     );

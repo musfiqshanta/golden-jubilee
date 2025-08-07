@@ -6,6 +6,7 @@ import '../services/donation_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../views/admin_registered_page.dart';
 import '../views/admin_approved_users_page.dart';
+import 'donations_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -66,6 +67,19 @@ class DashboardScreen extends StatelessWidget {
                             label: const Text('Search User'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1976D2),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.of(context).pushNamed('/admin/countdown-settings'),
+                            icon: const Icon(Icons.timer),
+                            label: const Text('Countdown Settings'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD4AF37),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -189,14 +203,49 @@ class DashboardScreen extends StatelessWidget {
           );
         },
       ),
-      // Donation (clickable)
+      // Total Donation Requests (clickable)
       GestureDetector(
         onTap: () {
-          Navigator.of(context).pushNamed('/admin/donations');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const DonationsScreen(),
+              settings: const RouteSettings(name: '/admin/donations'),
+            ),
+          );
         },
         child: StreamBuilder<QuerySnapshot>(
           stream:
               FirebaseFirestore.instance.collection('donations').snapshots(),
+          builder: (context, snapshot) {
+            int totalRequests = 0;
+            if (snapshot.hasData) {
+              totalRequests = snapshot.data!.docs.length;
+            }
+            return _statCard(
+              'Total Donation Requests',
+              totalRequests.toString(),
+              Icons.request_page,
+              isClickable: true,
+            );
+          },
+        ),
+      ),
+      // Approved Donations Amount (clickable)
+      GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const DonationsScreen(),
+              settings: const RouteSettings(name: '/admin/donations'),
+            ),
+          );
+        },
+        child: StreamBuilder<QuerySnapshot>(
+          stream:
+              FirebaseFirestore.instance
+                  .collection('donations')
+                  .where('status', isEqualTo: 'approved')
+                  .snapshots(),
           builder: (context, snapshot) {
             double totalDonation = 0;
             if (snapshot.hasData) {
@@ -206,7 +255,7 @@ class DashboardScreen extends StatelessWidget {
               }
             }
             return _statCard(
-              'Donation',
+              'Approved Donations',
               '৳$totalDonation',
               Icons.volunteer_activism,
               isClickable: true,

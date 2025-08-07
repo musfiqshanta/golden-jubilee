@@ -530,6 +530,12 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
               onChanged: (v) => setState(() => editedUser['gender'] = v),
             ),
             _infoRow(
+              'Blood Group',
+              userData['bloodGroup'] ?? '',
+              editable: isEditing,
+              onChanged: (v) => setState(() => editedUser['bloodGroup'] = v),
+            ),
+            _infoRow(
               'Date of Birth',
               _formatDate(userData['dateOfBirth']),
               editable: false,

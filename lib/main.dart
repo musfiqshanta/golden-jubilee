@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,7 +9,14 @@ import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app/modules/registration/views/registered_page.dart';
+import 'app/modules/registration/views/approved_users_page.dart';
 import 'app/modules/registration/views/check_registration_page.dart';
+import 'app/modules/donation/views/donation_home_page.dart';
+import 'app/modules/donation/views/verify_user_page.dart';
+import 'app/modules/donation/views/anonymous_donation_page.dart';
+import 'app/modules/donation/views/check_donation_page.dart';
+import 'app/modules/donation/views/donation_form_page.dart';
+import 'app/modules/donation/bindings/donation_binding.dart';
 import 'admin_panel/screens/login_screen.dart';
 import 'admin_panel/screens/dashboard_screen.dart';
 
@@ -18,6 +25,8 @@ import 'admin_panel/screens/donations_screen.dart';
 import 'admin_panel/screens/add_donation_screen.dart';
 import 'admin_panel/screens/edit_donation_screen.dart';
 import 'admin_panel/screens/search_user_screen.dart';
+import 'admin_panel/screens/countdown_settings_screen.dart';
+import 'services/countdown_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,9 +74,36 @@ class GoldenJubileeApp extends StatelessWidget {
           binding: RegistrationBinding(),
         ),
         GetPage(name: '/registered', page: () => RegisteredPage()),
+        GetPage(name: '/approved-users', page: () => ApprovedUsersPage()),
         GetPage(
           name: '/check-registration',
           page: () => CheckRegistrationPage(),
+        ),
+        // Donation routes
+        GetPage(
+          name: '/donation',
+          page: () => const DonationHomePage(),
+          binding: DonationBinding(),
+        ),
+        GetPage(
+          name: '/donation/verify-user',
+          page: () => const VerifyUserPage(),
+          binding: DonationBinding(),
+        ),
+        GetPage(
+          name: '/donation/anonymous',
+          page: () => const AnonymousDonationPage(),
+          binding: DonationBinding(),
+        ),
+        GetPage(
+          name: '/donation/check',
+          page: () => const CheckDonationPage(),
+          binding: DonationBinding(),
+        ),
+        GetPage(
+          name: '/donation/form',
+          page: () => const DonationFormPage(),
+          binding: DonationBinding(),
         ),
         // Admin panel routes
         GetPage(name: '/admin', page: () => const LoginScreen()),
@@ -85,6 +121,10 @@ class GoldenJubileeApp extends StatelessWidget {
         GetPage(
           name: '/admin/search-user',
           page: () => const SearchUserScreen(),
+        ),
+        GetPage(
+          name: '/admin/countdown-settings',
+          page: () => const CountdownSettingsScreen(),
         ),
       ],
     );
@@ -105,20 +145,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Countdown for next 4 months
-  late DateTime _fourMonthsLater;
-  Duration _fourMonthCountdown = Duration.zero;
-  Timer? _fourMonthTimer;
+  // Countdown service
+  final AppCountdownService _countdownService = AppCountdownService();
 
-  // Countdown to celebration event
-  final DateTime _eventDate = DateTime(2024, 12, 15, 0, 0, 0);
-  Duration _eventCountdown = Duration.zero;
-  Timer? _eventTimer;
-
-  // Countdown for 250 days
-  late DateTime _twoFiftyDaysLater;
-  Duration _twoFiftyCountdown = Duration.zero;
-  Timer? _twoFiftyTimer;
+  // Countdown durations
+  Duration _registrationCountdown = Duration.zero;
+  Duration _jubileeCountdown = Duration.zero;
 
   @override
   void initState() {
@@ -147,71 +179,28 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     _fadeController.forward();
     _slideController.forward();
 
-    // Countdown for next 4 months
-    _fourMonthsLater = DateTime.now().add(const Duration(days: 30 * 4));
-    _updateFourMonthCountdown();
-    _fourMonthTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateFourMonthCountdown();
+    // Initialize countdown service
+    _countdownService.initialize();
+
+    // Listen to countdown updates
+    _countdownService.registrationCountdownStream.listen((duration) {
+      setState(() {
+        _registrationCountdown = duration;
+      });
     });
 
-    // Countdown to event
-    _updateEventCountdown();
-    _eventTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateEventCountdown();
+    _countdownService.jubileeCountdownStream.listen((duration) {
+      setState(() {
+        _jubileeCountdown = duration;
+      });
     });
-
-    // Countdown for 250 days
-    _twoFiftyDaysLater = DateTime.now().add(const Duration(days: 250));
-    _updateTwoFiftyCountdown();
-    _twoFiftyTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateTwoFiftyCountdown();
-    });
-  }
-
-  void _updateFourMonthCountdown() {
-    final now = DateTime.now();
-    setState(() {
-      _fourMonthCountdown =
-          _fourMonthsLater.isAfter(now)
-              ? _fourMonthsLater.difference(now)
-              : Duration.zero;
-    });
-  }
-
-  void _updateEventCountdown() {
-    final now = DateTime.now();
-    setState(() {
-      _eventCountdown =
-          _eventDate.isAfter(now) ? _eventDate.difference(now) : Duration.zero;
-    });
-  }
-
-  void _updateTwoFiftyCountdown() {
-    final now = DateTime.now();
-    setState(() {
-      _twoFiftyCountdown =
-          _twoFiftyDaysLater.isAfter(now)
-              ? _twoFiftyDaysLater.difference(now)
-              : Duration.zero;
-    });
-  }
-
-  String _formatFourMonthCountdown() {
-    if (_fourMonthCountdown.inSeconds <= 0) return 'Countdown Finished';
-    final days = _fourMonthCountdown.inDays;
-    final hours = _fourMonthCountdown.inHours % 24;
-    final minutes = _fourMonthCountdown.inMinutes % 60;
-    final seconds = _fourMonthCountdown.inSeconds % 60;
-    return '${days}d ${hours}h ${minutes}m ${seconds}s';
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
-    _fourMonthTimer?.cancel();
-    _eventTimer?.cancel();
-    _twoFiftyTimer?.cancel();
+    _countdownService.dispose();
     super.dispose();
   }
 
@@ -242,10 +231,10 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   }
 
   Widget _buildHeroSection() {
-    final days = _fourMonthCountdown.inDays;
-    final hours = _fourMonthCountdown.inHours % 24;
-    final minutes = _fourMonthCountdown.inMinutes % 60;
-    final seconds = _fourMonthCountdown.inSeconds % 60;
+    final days = _registrationCountdown.inDays;
+    final hours = _registrationCountdown.inHours % 24;
+    final minutes = _registrationCountdown.inMinutes % 60;
+    final seconds = _registrationCountdown.inSeconds % 60;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),
@@ -367,6 +356,27 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                               ),
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              Get.toNamed('/donation');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1976D2),
+                              foregroundColor: Colors.white,
+                              padding: buttonPadding,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              'দান করুন',
+                              style: TextStyle(
+                                fontSize: buttonFontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ],
                       );
                     } else {
@@ -414,6 +424,35 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                               ),
                               child: Text(
                                 'নিবন্ধন যাচাই করুন',
+                                style: TextStyle(
+                                  fontSize: buttonFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Get.toNamed('/donation');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                  255,
+                                  0,
+                                  119,
+                                  109,
+                                ),
+                                foregroundColor: Colors.white,
+                                padding: buttonPadding,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: Text(
+                                'আনুদান করুন',
                                 style: TextStyle(
                                   fontSize: buttonFontSize,
                                   fontWeight: FontWeight.bold,
@@ -515,73 +554,149 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                         ),
                       ),
                       // মোট সংগ্রহ
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 15,
-                        ),
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(25),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
+                      Tooltip(
+                        message: 'অনুমোদিত ব্যক্তিদের তালিকা দেখুন',
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              print('Total collection tapped');
+                              Get.toNamed('/approved-users');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 30,
+                                vertical: 15,
+                              ),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.attach_money,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text(
+                                        'মোট সংগ্রহ: ',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 70,
+                                        child: StreamBuilder<QuerySnapshot>(
+                                          stream:
+                                              FirebaseFirestore.instance
+                                                  .collectionGroup(
+                                                    'registrations',
+                                                  )
+                                                  .where(
+                                                    'paymentStatus',
+                                                    isEqualTo: 'approved',
+                                                  )
+                                                  .snapshots(),
+                                          builder: (context, snapshot) {
+                                            double totalCollection = 0;
+                                            int approvedCount = 0;
+                                            if (snapshot.hasData) {
+                                              approvedCount =
+                                                  snapshot.data!.docs.length;
+                                              for (var doc
+                                                  in snapshot.data!.docs) {
+                                                final data =
+                                                    doc.data()
+                                                        as Map<String, dynamic>;
+                                                totalCollection +=
+                                                    (data['totalPayable'] ?? 0)
+                                                        as num;
+                                              }
+                                            }
+                                            return Text(
+                                              '৳$totalCollection',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      const Text(
+                                        'অনুমোদিত: ',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 30,
+                                        child: StreamBuilder<QuerySnapshot>(
+                                          stream:
+                                              FirebaseFirestore.instance
+                                                  .collectionGroup(
+                                                    'registrations',
+                                                  )
+                                                  .where(
+                                                    'paymentStatus',
+                                                    isEqualTo: 'approved',
+                                                  )
+                                                  .snapshots(),
+                                          builder: (context, snapshot) {
+                                            int approvedCount = 0;
+                                            if (snapshot.hasData) {
+                                              approvedCount =
+                                                  snapshot.data!.docs.length;
+                                            }
+                                            return Text(
+                                              '$approvedCount',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.attach_money,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'মোট সংগ্রহ: ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(
-                              width: 70,
-                              child: StreamBuilder<QuerySnapshot>(
-                                stream:
-                                    FirebaseFirestore.instance
-                                        .collectionGroup('registrations')
-                                        .where(
-                                          'paymentStatus',
-                                          isEqualTo: 'approved',
-                                        )
-                                        .snapshots(),
-                                builder: (context, snapshot) {
-                                  double totalCollection = 0;
-                                  if (snapshot.hasData) {
-                                    for (var doc in snapshot.data!.docs) {
-                                      final data =
-                                          doc.data() as Map<String, dynamic>;
-                                      totalCollection +=
-                                          (data['totalPayable'] ?? 0) as num;
-                                    }
-                                  }
-                                  return Text(
-                                    '৳$totalCollection',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                       // মোট অনুদান
@@ -681,10 +796,10 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     final labelSize = isMobile ? 10.0 : (isWide ? 14.0 : 12.0);
     final spacing = isMobile ? 8.0 : 20.0;
     final titleSize = isMobile ? 18.0 : (isWide ? 32.0 : 22.0);
-    final days = _twoFiftyCountdown.inDays;
-    final hours = _twoFiftyCountdown.inHours % 24;
-    final minutes = _twoFiftyCountdown.inMinutes % 60;
-    final seconds = _twoFiftyCountdown.inSeconds % 60;
+    final days = _jubileeCountdown.inDays;
+    final hours = _jubileeCountdown.inHours % 24;
+    final minutes = _jubileeCountdown.inMinutes % 60;
+    final seconds = _jubileeCountdown.inSeconds % 60;
     return Container(
       padding: EdgeInsets.symmetric(
         vertical: isMobile ? 30.0 : 40.0,
@@ -905,25 +1020,25 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 'উদ্বোধনী অনুষ্ঠান',
                 '৫০ বছর পূর্তি উদযাপনের জাঁকজমকপূর্ণ উদ্বোধন',
                 Icons.event,
-                '১৫ ডিসেম্বর, ২০২৪',
+                ' ফেব্রুয়ারি , ২০২৫',
               ),
               _buildEventCard(
-                'গালা ডিনার',
-                'বর্ণাঢ্য সন্ধ্যায় সুস্বাদু খাবার ও বিনোদন',
+                'গালা লাঞ্চ',
+                ' লাঞ্চ, সুস্বাদু খাবার ও বিনোদন',
                 Icons.restaurant,
-                '১৬ ডিসেম্বর, ২০২৪',
+                'ফেব্রুয়ারি , ২০২৫',
               ),
               _buildEventCard(
                 'সাংস্কৃতিক অনুষ্ঠান',
                 'আমাদের সমৃদ্ধ ঐতিহ্য ও সাংস্কৃতিক বৈচিত্র্য উপস্থাপন',
                 Icons.music_note,
-                '১৭ ডিসেম্বর, ২০২৪',
+                'ফেব্রুয়ারি, ২০২৫',
               ),
               _buildEventCard(
                 'সমাপনী অনুষ্ঠান',
                 'সুবর্ণজয়ন্তী উদযাপনের স্মরণীয় সমাপ্তি',
                 Icons.celebration,
-                '১৮ ডিসেম্বর, ২০২৪',
+                'ফেব্রুয়ারি, ২০২৫',
               ),
             ],
           ),

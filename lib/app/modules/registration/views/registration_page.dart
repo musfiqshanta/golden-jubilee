@@ -58,6 +58,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   ),
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
+                        //razuiqbal1996@gmail.com
                         MouseRegion(
                           cursor: SystemMouseCursors.click,
                           child: ElevatedButton.icon(
@@ -184,6 +185,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     controller: controller.nameController,
                     label: 'পূর্ণ নাম',
                     icon: Icons.person_outline,
+                    hintText: 'বাংলায় আপনার পূর্ণ নাম লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -195,6 +197,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     controller: controller.fatherNameController,
                     label: 'পিতার নাম',
                     icon: Icons.person_outline,
+                    hintText: 'বাংলায় আপনার পিতার নাম লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -206,6 +209,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     controller: controller.motherNameController,
                     label: 'মাতার নাম',
                     icon: Icons.person_outline,
+                    hintText: 'বাংলায় আপনার মাতার নাম লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -225,6 +229,17 @@ class RegistrationPage extends GetView<RegistrationController> {
                   ),
                   const SizedBox(height: 15),
                   Obx(
+                    () => _dropdownField(
+                      label: 'রক্তের গ্রুপ',
+                      value: controller.selectedBloodGroup.value,
+                      items: controller.bloodGroups,
+                      onChanged:
+                          (value) =>
+                              controller.selectedBloodGroup.value = value ?? '',
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Obx(
                     () => _dateField(
                       label: 'জন্ম তারিখ',
                       value: controller.selectedDateOfBirth.value,
@@ -234,23 +249,22 @@ class RegistrationPage extends GetView<RegistrationController> {
                   const SizedBox(height: 15),
                   _textField(
                     controller: controller.nationalIdController,
-                    label: 'জাতীয় পরিচয়পত্র নম্বর',
+                    label: 'জাতীয় পরিচয়পত্র নম্বর (ঐচ্ছিক)',
                     icon: Icons.badge_outlined,
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'আপনার জাতীয় পরিচয়পত্র নম্বর লিখুন'
-                                : null,
+                    hintText: 'ইংরেজিতে জাতীয় পরিচয়পত্র নম্বর লিখুন (ঐচ্ছিক)',
+                    validator: (value) => null, // Optional field
                   ),
                 ]),
                 const SizedBox(height: 20),
                 // Contact Information Section
-                _sectionCard('যোগাযোগের তথ্য (ইংলিশ)', Icons.contact_phone, [
+                _sectionCard('যোগাযোগের তথ্য', Icons.contact_phone, [
                   _textField(
                     controller: controller.mobileController,
                     label: 'মোবাইল নম্বর',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
+                    hintText:
+                        'ইংরেজিতে মোবাইল নম্বর লিখুন (উদাহরণ: 01XXXXXXXXX)',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -260,17 +274,18 @@ class RegistrationPage extends GetView<RegistrationController> {
                   const SizedBox(height: 15),
                   _textField(
                     controller: controller.emailController,
-                    label: 'ইমেইল ঠিকানা',
+                    label: 'ইমেইল ঠিকানা (ঐচ্ছিক)',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
+                    hintText: 'ইংরেজিতে ইমেইল ঠিকানা লিখুন (ঐচ্ছিক)',
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'আপনার ইমেইল লিখুন';
-                      }
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}',
-                      ).hasMatch(value)) {
-                        return 'সঠিক ইমেইল লিখুন';
+                      // Optional field - only validate if provided
+                      if (value != null && value.isNotEmpty) {
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}',
+                        ).hasMatch(value)) {
+                          return 'সঠিক ইমেইল লিখুন';
+                        }
                       }
                       return null;
                     },
@@ -284,6 +299,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     label: 'স্থায়ী ঠিকানা',
                     icon: Icons.home_outlined,
                     maxLines: 3,
+                    hintText: 'বাংলায় আপনার স্থায়ী ঠিকানা লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -296,6 +312,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     label: 'বর্তমান ঠিকানা',
                     icon: Icons.home_outlined,
                     maxLines: 3,
+                    hintText: 'বাংলায় আপনার বর্তমান ঠিকানা লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -310,6 +327,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     controller: controller.occupationController,
                     label: 'পেশা',
                     icon: Icons.work_outline,
+                    hintText: 'বাংলায় আপনার পেশা লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -321,6 +339,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     controller: controller.designationController,
                     label: 'পদবী',
                     icon: Icons.badge_outlined,
+                    hintText: 'বাংলায় আপনার পদবী লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -333,6 +352,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                     label: 'কর্মস্থলের ঠিকানা',
                     icon: Icons.business_outlined,
                     maxLines: 3,
+                    hintText: 'বাংলায় আপনার কর্মস্থলের ঠিকানা লিখুন',
                     validator:
                         (value) =>
                             value == null || value.isEmpty
@@ -742,12 +762,15 @@ class RegistrationPage extends GetView<RegistrationController> {
             children: [
               Icon(icon, color: const Color(0xFFD4AF37), size: 24),
               const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B6914),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B6914),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -766,21 +789,38 @@ class RegistrationPage extends GetView<RegistrationController> {
     TextInputType? keyboardType,
     int maxLines = 1,
     String? Function(String?)? validator,
+    String? hintText,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFFD4AF37)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFD4AF37), width: 2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          validator: validator,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, color: const Color(0xFFD4AF37)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFFD4AF37), width: 2),
+            ),
+          ),
         ),
-      ),
+        if (hintText != null) ...[
+          const SizedBox(height: 5),
+          Text(
+            hintText,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.orange,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -898,15 +938,37 @@ class RegistrationPage extends GetView<RegistrationController> {
   }
 
   String _buildTotalAmountText(RegistrationController controller) {
-    final int baseFee = controller.isRunningStudent.value ? 700 : 1200;
+    // Determine base fee based on student type and passing year
+    int baseFee;
+    String feeDescription;
+
+    if (controller.isRunningStudent.value) {
+      baseFee = 500; // Running students now pay 500
+      feeDescription = 'বর্তমানে অধ্যয়নরত: 500 টাকা';
+    } else {
+      // For old students, check if they passed between 2019-2026
+      final passingYear = controller.selectedSscPassingYear.value;
+      if (passingYear != 'None') {
+        final year = int.tryParse(passingYear);
+        if (year != null && year >= 2019 && year <= 2026) {
+          baseFee = 700; // Old students who passed 2019-2026 pay 700
+          feeDescription = 'প্রাক্তন শিক্ষার্থী (২০১৯-২০২৬): 700 টাকা';
+        } else {
+          baseFee = 1200; // Other old students pay 1200
+          feeDescription = 'প্রাক্তন শিক্ষার্থী: 1200 টাকা';
+        }
+      } else {
+        baseFee = 1200; // Default for old students
+        feeDescription = 'প্রাক্তন শিক্ষার্থী: 1200 টাকা';
+      }
+    }
+
     final int guestCount =
         controller.spouseCount.value + controller.childCount.value;
     final int guestFee = guestCount * 500;
     final int total = baseFee + guestFee;
-    String details =
-        controller.isRunningStudent.value
-            ? 'বর্তমানে অধ্যয়নরত: 700 টাকা'
-            : 'প্রাক্তন শিক্ষার্থী: 1200 টাকা';
+
+    String details = feeDescription;
     details += '\nপরিবারের সদস্য ($guestCount জন): $guestFee টাকা';
     details += '\n-----------------------------';
     details += '\nমোট: $total টাকা';

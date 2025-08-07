@@ -13,7 +13,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
-import 'dart:html' if (dart.library.io) 'dart:io' as html;
+// Conditional web imports
+import 'package:suborno_joyonti/app/services/pdf_service_web.dart'
+    if (dart.library.io) 'package:suborno_joyonti/app/services/pdf_service_mobile.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 
 class RegistrationController extends GetxController {
@@ -46,6 +48,7 @@ class RegistrationController extends GetxController {
   var photoError = RxnString();
   var isRunningStudent = false.obs;
   var selectedTshirtSize = RxnString();
+  var selectedBloodGroup = ''.obs;
 
   // Dropdown lists
   final List<String> tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -57,6 +60,17 @@ class RegistrationController extends GetxController {
     'অন্যান্য',
   ];
   final List<String> nationalities = ['বাংলাদেশী', 'অন্যান্য'];
+  final List<String> bloodGroups = [
+    'জানি না / জানা নেই',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
+  ];
   final List<String> finalClasses = [
     '৬ষ্ঠ শ্রেণি',
     '৭ম শ্রেণি',
@@ -275,7 +289,7 @@ class RegistrationController extends GetxController {
       print('Selected photo: \\${selectedPhoto.value}');
       http.MultipartRequest request = http.MultipartRequest(
         'POST',
-        Uri.parse('https://jahajmarahighschool.com/api/upload.php'),
+        Uri.parse('https://jubilee.jahajmarahighschool.com/api/upload.php'),
       );
       request.fields['phone'] = mobileController.text.trim();
       request.fields['year'] = selectedSscPassingYear.value ?? '';
@@ -578,7 +592,26 @@ class RegistrationController extends GetxController {
   Map<String, dynamic> _collectRegistrationData(String batch) {
     // Calculate total payable amount
     final bool isRunning = isRunningStudent.value;
-    final int baseFee = isRunning ? 700 : 1200;
+
+    // Determine base fee based on student type and passing year
+    int baseFee;
+    if (isRunning) {
+      baseFee = 500; // Running students now pay 500
+    } else {
+      // For old students, check if they passed between 2019-2026
+      final passingYear = selectedSscPassingYear.value;
+      if (passingYear != 'None') {
+        final year = int.tryParse(passingYear);
+        if (year != null && year >= 2019 && year <= 2026) {
+          baseFee = 700; // Old students who passed 2019-2026 pay 700
+        } else {
+          baseFee = 1200; // Other old students pay 1200
+        }
+      } else {
+        baseFee = 1200; // Default for old students
+      }
+    }
+
     final int guestCount = spouseCount.value + childCount.value;
     final int guestFee = guestCount * 500;
     final int totalPayable = baseFee + guestFee;
@@ -588,6 +621,7 @@ class RegistrationController extends GetxController {
       'fatherName': fatherNameController.text.trim(),
       'motherName': motherNameController.text.trim(),
       'gender': selectedGender.value,
+      'bloodGroup': selectedBloodGroup.value,
       'dateOfBirth': selectedDateOfBirth.value?.toIso8601String(),
       'nationalId': nationalIdController.text.trim(),
       'mobile': mobileController.text.trim(),
@@ -629,6 +663,7 @@ class RegistrationController extends GetxController {
     mobileController.text = '01700000000';
     emailController.text = 'demo@example.com';
     selectedGender.value = 'পুরুষ';
+    selectedBloodGroup.value = 'A+';
     selectedReligion.value = 'ইসলাম';
     selectedNationality.value = 'বাংলাদেশী';
     selectedFinalClass.value = '১০ম শ্রেণি';
@@ -753,13 +788,7 @@ class RegistrationController extends GetxController {
     if (kIsWeb) {
       // For web, create a download
       final pdfBytes = await pdf.save();
-      final blob = html.Blob([pdfBytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor =
-          html.AnchorElement(href: url)
-            ..setAttribute('download', 'invoice.pdf')
-            ..click();
-      html.Url.revokeObjectUrl(url);
+      PdfServiceWeb.downloadPdf(pdfBytes, 'invoice.pdf', null);
     } else {
       // For mobile/desktop platforms
       final outputDir = await getTemporaryDirectory();
@@ -812,7 +841,27 @@ class RegistrationController extends GetxController {
 
       // Calculate total guest and total amount before PDF generation
       int totalGuest = spouseCount.value + childCount.value;
-      int participantAmount = isRunningStudent.value ? 700 : 1200;
+
+      // Determine participant amount based on student type and passing year
+      int participantAmount;
+      if (isRunningStudent.value) {
+        participantAmount = 500; // Running students now pay 500
+      } else {
+        // For old students, check if they passed between 2019-2026
+        final passingYear = selectedSscPassingYear.value;
+        if (passingYear != 'None') {
+          final year = int.tryParse(passingYear);
+          if (year != null && year >= 2019 && year <= 2026) {
+            participantAmount =
+                700; // Old students who passed 2019-2026 pay 700
+          } else {
+            participantAmount = 1200; // Other old students pay 1200
+          }
+        } else {
+          participantAmount = 1200; // Default for old students
+        }
+      }
+
       totalAmount = participantAmount + (totalGuest * 500);
 
       // Get the current form serial number (total registrations + 1)
@@ -1263,21 +1312,10 @@ class RegistrationController extends GetxController {
 
       if (kIsWeb) {
         final pdfBytes = await pdf.save();
-        final blob = html.Blob([pdfBytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor =
-            html.AnchorElement(href: url)
-              ..setAttribute(
-                'download',
-                'registration_${mobileController.text}.pdf',
-              )
-              ..click();
-        html.Url.revokeObjectUrl(url);
-        Get.snackbar(
-          'সফল',
-          'নিবন্ধন পিডিএফ ডাউনলোড হয়েছে',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
+        PdfServiceWeb.downloadPdf(
+          pdfBytes,
+          'registration_${mobileController.text}.pdf',
+          null,
         );
       } else {
         final outputDir = await getTemporaryDirectory();
@@ -1442,14 +1480,7 @@ class RegistrationController extends GetxController {
       // Save the PDF
       if (kIsWeb) {
         final pdfBytes = await pdf.save();
-        final blob = html.Blob([pdfBytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor =
-            html.AnchorElement(href: url)
-              ..setAttribute('download', 'bengali_test.pdf')
-              ..click();
-        html.Url.revokeObjectUrl(url);
-
+        PdfServiceWeb.downloadPdf(pdfBytes, 'bengali_test.pdf', null);
         Get.snackbar(
           'সফল',
           'বাংলা পিডিএফ টেস্ট ডাউনলোড হয়েছে',

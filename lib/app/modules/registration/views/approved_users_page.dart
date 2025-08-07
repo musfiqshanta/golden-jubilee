@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RegisteredPage extends StatelessWidget {
-  const RegisteredPage({super.key});
+class ApprovedUsersPage extends StatelessWidget {
+  const ApprovedUsersPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    print('Building RegisteredPage');
+    print('Building ApprovedUsersPage');
     try {
       return Scaffold(
         appBar: AppBar(
           title: const Text(
-            'নিবন্ধিত ব্যাচসমূহ',
+            'অনুমোদিত ব্যাচসমূহ',
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: const Color(0xFFD4AF37),
@@ -22,13 +22,16 @@ class RegisteredPage extends StatelessWidget {
           stream:
               FirebaseFirestore.instance
                   .collectionGroup('registrations')
+                  .where('paymentStatus', isEqualTo: 'approved')
                   .snapshots(),
           builder: (context, regSnapshot) {
             if (regSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
             if (!regSnapshot.hasData || regSnapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('No registrations found.'));
+              return const Center(
+                child: Text('No approved registrations found.'),
+              );
             }
             // Group registrations by batchId (parent.id)
             final Map<String, List<QueryDocumentSnapshot>> batchMap = {};
@@ -88,23 +91,15 @@ class RegisteredPage extends StatelessWidget {
                       if (batchId == '__running_batch__') {
                         // Virtual card for Running Batch
                         int totalRunning = 0;
-                        int totalApproved = 0;
                         for (var classId in runningClassBatches) {
-                          final classRegistrations = batchMap[classId] ?? [];
-                          totalRunning += classRegistrations.length;
-                          for (var doc in classRegistrations) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            if (data['paymentStatus'] == 'approved') {
-                              totalApproved++;
-                            }
-                          }
+                          totalRunning += batchMap[classId]?.length ?? 0;
                         }
                         return MouseRegion(
                           cursor: SystemMouseCursors.click,
                           child: GestureDetector(
                             onTap: () {
                               Get.to(
-                                () => RunningBatchPage(
+                                () => ApprovedRunningBatchPage(
                                   runningClassBatches: runningClassBatches,
                                   batchMap: batchMap,
                                 ),
@@ -154,16 +149,15 @@ class RegisteredPage extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  // Total registrations
+                                  const SizedBox(height: 10),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
+                                      horizontal: 8,
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.18),
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -171,51 +165,13 @@ class RegisteredPage extends StatelessWidget {
                                         const Icon(
                                           Icons.people,
                                           color: Colors.white,
-                                          size: 13,
+                                          size: 15,
                                         ),
                                         const SizedBox(width: 2),
                                         Text(
                                           '$totalRunning',
                                           style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black26,
-                                                blurRadius: 2,
-                                                offset: Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // Approved count
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.white,
-                                          size: 13,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '$totalApproved',
-                                          style: const TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
                                             shadows: [
@@ -238,21 +194,13 @@ class RegisteredPage extends StatelessWidget {
                       }
                       // Normal batch card
                       final regCount = batchMap[batchId]?.length ?? 0;
-                      // Calculate approved count for this batch
-                      int approvedCount = 0;
-                      if (batchMap[batchId] != null) {
-                        for (var doc in batchMap[batchId]!) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          if (data['paymentStatus'] == 'approved') {
-                            approvedCount++;
-                          }
-                        }
-                      }
                       return MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: GestureDetector(
                           onTap: () {
-                            Get.to(() => BatchDetailsPage(batchId: batchId));
+                            Get.to(
+                              () => ApprovedBatchDetailsPage(batchId: batchId),
+                            );
                           },
                           child: Container(
                             decoration: BoxDecoration(
@@ -288,16 +236,15 @@ class RegisteredPage extends StatelessWidget {
                                     letterSpacing: 1.1,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                // Total registrations
+                                const SizedBox(height: 10),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
+                                    horizontal: 8,
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.18),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -305,44 +252,13 @@ class RegisteredPage extends StatelessWidget {
                                       const Icon(
                                         Icons.people,
                                         color: Colors.white,
-                                        size: 11,
+                                        size: 13,
                                       ),
                                       const SizedBox(width: 2),
                                       Text(
                                         '$regCount',
                                         style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                // Approved count
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white,
-                                        size: 11,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '$approvedCount',
-                                        style: const TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
@@ -364,24 +280,24 @@ class RegisteredPage extends StatelessWidget {
         ),
       );
     } catch (e, st) {
-      print('Error building RegisteredPage: $e\n$st');
+      print('Error building ApprovedUsersPage: $e\n$st');
       return const Center(child: Text('Error loading page'));
     }
   }
 }
 
-class BatchDetailsPage extends StatelessWidget {
+class ApprovedBatchDetailsPage extends StatelessWidget {
   final String batchId;
-  const BatchDetailsPage({super.key, required this.batchId});
+  const ApprovedBatchDetailsPage({super.key, required this.batchId});
 
   @override
   Widget build(BuildContext context) {
-    print('Building BatchDetailsPage for batch $batchId');
+    print('Building ApprovedBatchDetailsPage for batch $batchId');
     try {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'ব্যাচ $batchId নিবন্ধনসমূহ',
+            'ব্যাচ $batchId অনুমোদিত নিবন্ধনসমূহ',
             style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: const Color(0xFFD4AF37),
@@ -393,13 +309,16 @@ class BatchDetailsPage extends StatelessWidget {
                   .collection('batches')
                   .doc(batchId)
                   .collection('registrations')
+                  .where('paymentStatus', isEqualTo: 'approved')
                   .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('No registrations found.'));
+              return const Center(
+                child: Text('No approved registrations found.'),
+              );
             }
             final regs = snapshot.data!.docs;
             return ListView.builder(
@@ -411,35 +330,7 @@ class BatchDetailsPage extends StatelessWidget {
                 final photoUrl = data['photoUrl'] as String?;
                 final name = data['name'] ?? '';
                 final mobile = data['mobile'] ?? '';
-                final paymentStatus = data['paymentStatus'] ?? 'pending';
                 final totalPayable = data['totalPayable'] ?? 0;
-
-                // Determine color based on payment status
-                Color statusColor;
-                IconData statusIcon;
-                String statusText;
-
-                switch (paymentStatus) {
-                  case 'approved':
-                    statusColor = Colors.green;
-                    statusIcon = Icons.check_circle;
-                    statusText = 'অনুমোদিত';
-                    break;
-                  case 'pending':
-                    statusColor = Colors.orange;
-                    statusIcon = Icons.pending;
-                    statusText = 'অপেক্ষমান';
-                    break;
-                  case 'rejected':
-                    statusColor = Colors.red;
-                    statusIcon = Icons.cancel;
-                    statusText = 'প্রত্যাখ্যাত';
-                    break;
-                  default:
-                    statusColor = Colors.grey;
-                    statusIcon = Icons.help;
-                    statusText = 'অজানা';
-                }
                 print(photoUrl);
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
@@ -474,29 +365,12 @@ class BatchDetailsPage extends StatelessWidget {
                           'Mobile: ${_obscureMobile(mobile)}',
                           style: const TextStyle(letterSpacing: 1.2),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(statusIcon, color: statusColor, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              statusText,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '৳$totalPayable',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFD4AF37),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Amount: ৳$totalPayable',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD4AF37),
+                          ),
                         ),
                       ],
                     ),
@@ -508,7 +382,7 @@ class BatchDetailsPage extends StatelessWidget {
         ),
       );
     } catch (e, st) {
-      print('Error building BatchDetailsPage: $e\n$st');
+      print('Error building ApprovedBatchDetailsPage: $e\n$st');
       return const Center(child: Text('Error loading page'));
     }
   }
@@ -520,10 +394,10 @@ String _obscureMobile(String mobile) {
   return '*' * (mobile.length - 4) + last4;
 }
 
-class RunningBatchPage extends StatelessWidget {
+class ApprovedRunningBatchPage extends StatelessWidget {
   final List<String> runningClassBatches;
   final Map<String, List<QueryDocumentSnapshot>> batchMap;
-  const RunningBatchPage({
+  const ApprovedRunningBatchPage({
     super.key,
     required this.runningClassBatches,
     required this.batchMap,
@@ -538,7 +412,7 @@ class RunningBatchPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'বর্তমানে অধ্যয়নরত শ্রেণিসমূহ',
+          'বর্তমানে অধ্যয়নরত শ্রেণিসমূহ (অনুমোদিত)',
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: const Color(0xFFD4AF37),
@@ -568,21 +442,11 @@ class RunningBatchPage extends StatelessWidget {
               itemBuilder: (context, index) {
                 final classId = sortedClasses[index];
                 final regCount = batchMap[classId]?.length ?? 0;
-                // Calculate approved count for this class
-                int approvedCount = 0;
-                if (batchMap[classId] != null) {
-                  for (var doc in batchMap[classId]!) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    if (data['paymentStatus'] == 'approved') {
-                      approvedCount++;
-                    }
-                  }
-                }
                 return MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () {
-                      Get.to(() => BatchDetailsPage(batchId: classId));
+                      Get.to(() => ApprovedBatchDetailsPage(batchId: classId));
                     },
                     child: Container(
                       decoration: BoxDecoration(
@@ -618,16 +482,15 @@ class RunningBatchPage extends StatelessWidget {
                               letterSpacing: 1.1,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          // Total registrations
+                          const SizedBox(height: 10),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
+                              horizontal: 8,
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -635,44 +498,13 @@ class RunningBatchPage extends StatelessWidget {
                                 const Icon(
                                   Icons.people,
                                   color: Colors.white,
-                                  size: 11,
+                                  size: 13,
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
                                   '$regCount',
                                   style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Approved count
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white,
-                                  size: 11,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '$approvedCount',
-                                  style: const TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                   ),

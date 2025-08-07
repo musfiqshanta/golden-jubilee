@@ -133,6 +133,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                   controller: _donorNameController,
                   decoration: const InputDecoration(
                     labelText: 'Donor Name *',
+                    hintText: 'Enter donor name',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
@@ -149,6 +150,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 controller: _donorPhoneController,
                 decoration: const InputDecoration(
                   labelText: 'Phone Number',
+                  hintText: '01XXXXXXXXX',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.phone),
                 ),
@@ -160,6 +162,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 controller: _donorEmailController,
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
+                  hintText: 'example@email.com',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
@@ -171,6 +174,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 controller: _donorAddressController,
                 decoration: const InputDecoration(
                   labelText: 'Address',
+                  hintText: 'Enter address in Bangla',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.location_on),
                 ),
@@ -264,6 +268,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 controller: _purposeController,
                 decoration: const InputDecoration(
                   labelText: 'Purpose of Donation',
+                  hintText: 'Enter purpose in Bangla or English',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.description),
                 ),
@@ -279,6 +284,7 @@ class _AddDonationScreenState extends State<AddDonationScreen> {
                 controller: _notesController,
                 decoration: const InputDecoration(
                   labelText: 'Notes/Remarks',
+                  hintText: 'Enter notes in Bangla or English',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.note),
                 ),

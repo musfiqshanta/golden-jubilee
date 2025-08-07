@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'update_registration_page.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 
 class CheckRegistrationPage extends StatefulWidget {
@@ -351,6 +350,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                           keyboardType: TextInputType.phone,
                           decoration: InputDecoration(
                             labelText: 'মোবাইল নম্বর',
+                            hintText: '01XXXXXXXXX',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -479,39 +479,39 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                         ),
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: ElevatedButton.icon(
-                                    icon: const Icon(Icons.edit),
-                                    label: const Text(
-                                      'তথ্য আপডেট করুন',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(0xFFD4AF37),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      Get.to(
-                                        () => UpdateRegistrationPage(
-                                          batchId: selectedBatch!,
-                                          phone: phoneController.text.trim(),
-                                          registrationData: foundRegistration!,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
+                                // const SizedBox(width: 16),
+                                // MouseRegion(
+                                //   cursor: SystemMouseCursors.click,
+                                //   child: ElevatedButton.icon(
+                                //     icon: const Icon(Icons.edit),
+                                //     label: const Text(
+                                //       'তথ্য আপডেট করুন',
+                                //       style: TextStyle(
+                                //         fontWeight: FontWeight.bold,
+                                //       ),
+                                //     ),
+                                //     style: ElevatedButton.styleFrom(
+                                //       backgroundColor: Color(0xFFD4AF37),
+                                //       foregroundColor: Colors.white,
+                                //       padding: const EdgeInsets.symmetric(
+                                //         horizontal: 24,
+                                //         vertical: 14,
+                                //       ),
+                                //       shape: RoundedRectangleBorder(
+                                //         borderRadius: BorderRadius.circular(10),
+                                //       ),
+                                //     ),
+                                //     onPressed: () {
+                                //       Get.to(
+                                //         () => UpdateRegistrationPage(
+                                //           batchId: selectedBatch!,
+                                //           phone: phoneController.text.trim(),
+                                //           registrationData: foundRegistration!,
+                                //         ),
+                                //       );
+                                //     },
+                                //   ),
+                                // ),
                               ],
                             ),
                           ] else if (!isLoading) ...[
@@ -576,6 +576,35 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     final spouseCount = registration['spouseCount'] ?? 0;
     final childCount = registration['childCount'] ?? 0;
     final totalGuests = spouseCount + childCount;
+    final paymentStatus = registration['paymentStatus'] ?? 'pending';
+    final totalPayable = registration['totalPayable'] ?? 0;
+
+    // Determine payment status color and text
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (paymentStatus) {
+      case 'approved':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusText = 'অনুমোদিত';
+        break;
+      case 'pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.pending;
+        statusText = 'অপেক্ষমান';
+        break;
+      case 'rejected':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusText = 'প্রত্যাখ্যাত';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help;
+        statusText = 'অজানা';
+    }
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -626,6 +655,39 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          // Payment Status Display
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: statusColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(statusIcon, color: statusColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'পেমেন্ট স্ট্যাটাস: $statusText',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '৳$totalPayable',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 15),
           if (photoUrl != null && photoUrl.isNotEmpty)
