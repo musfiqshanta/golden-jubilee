@@ -34,7 +34,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set environment - change this to Environment.development for testing
-  CollectionConfig.setEnvironment(Environment.production);
+  CollectionConfig.setEnvironment(Environment.development);
 
   // Initialize Firebase (same project, different collections)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

@@ -59,29 +59,29 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
                         //razuiqbal1996@gmail.com
-                        // MouseRegion(
-                        //   cursor: SystemMouseCursors.click,
-                        //   child: ElevatedButton.icon(
-                        //     icon: const Icon(Icons.auto_fix_high, size: 18),
-                        //     label: const Text(
-                        //       'ডেমো ডাটা পূরণ করুন',
-                        //       style: TextStyle(fontSize: 12),
-                        //     ),
-                        //     style: ElevatedButton.styleFrom(
-                        //       backgroundColor: Colors.blueGrey.shade100,
-                        //       foregroundColor: Colors.black87,
-                        //       padding: const EdgeInsets.symmetric(
-                        //         horizontal: 12,
-                        //         vertical: 8,
-                        //       ),
-                        //       shape: RoundedRectangleBorder(
-                        //         borderRadius: BorderRadius.circular(8),
-                        //       ),
-                        //       elevation: 0,
-                        //     ),
-                        //     onPressed: controller.fillDemoData,
-                        //   ),
-                        // ),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.auto_fix_high, size: 18),
+                            label: const Text(
+                              'ডেমো ডাটা পূরণ করুন',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueGrey.shade100,
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: controller.fillDemoData,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -498,6 +498,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                   final newTotal = value + currentChildCount;
                                   if (newTotal <= 3) {
                                     controller.spouseCount.value = value;
+                                    controller.updateGuestDetails();
                                   } else {
                                     // Show warning if total would exceed 3
                                     Get.snackbar(
@@ -524,6 +525,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                   final newTotal = currentSpouseCount + value;
                                   if (newTotal <= 3) {
                                     controller.childCount.value = value;
+                                    controller.updateGuestDetails();
                                   } else {
                                     // Show warning if total would exceed 3
                                     Get.snackbar(
@@ -539,6 +541,113 @@ class RegistrationPage extends GetView<RegistrationController> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 15),
+
+                        // Guest Details Input Fields
+                        Obx(() {
+                          final totalGuests =
+                              controller.spouseCount.value +
+                              controller.childCount.value;
+                          if (totalGuests == 0) return const SizedBox.shrink();
+
+                          return Column(
+                            children: [
+                              Text(
+                                'অতিথির বিবরণ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF8B6914),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ...List.generate(totalGuests, (index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: TextFormField(
+                                          decoration: InputDecoration(
+                                            labelText:
+                                                'অতিথি ${index + 1} এর নাম',
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                          ),
+                                          onChanged: (value) {
+                                            if (index <
+                                                controller.guestNames.length) {
+                                              controller.guestNames[index] =
+                                                  value;
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 2,
+                                        child: DropdownButtonFormField<String>(
+                                          decoration: InputDecoration(
+                                            labelText: 'সম্পর্ক',
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                          ),
+                                          value:
+                                              index <
+                                                      controller
+                                                          .guestRelationships
+                                                          .length
+                                                  ? controller
+                                                      .guestRelationships[index]
+                                                  : 'স্বামী',
+                                          items:
+                                              controller
+                                                  .guestRelationshipOptions
+                                                  .map((relationship) {
+                                                    return DropdownMenuItem<
+                                                      String
+                                                    >(
+                                                      value: relationship,
+                                                      child: Text(relationship),
+                                                    );
+                                                  })
+                                                  .toList(),
+                                          onChanged: (value) {
+                                            if (value != null &&
+                                                index <
+                                                    controller
+                                                        .guestRelationships
+                                                        .length) {
+                                              controller
+                                                      .guestRelationships[index] =
+                                                  value;
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          );
+                        }),
+
                         const SizedBox(height: 15),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -782,6 +891,70 @@ class RegistrationPage extends GetView<RegistrationController> {
                               ),
                             )
                             : const SizedBox(),
+                  ),
+
+                  // Beautiful note about photo requirements
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFD4AF37).withOpacity(0.1),
+                          const Color(0xFFD4AF37).withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.info_outline,
+                            color: Color(0xFF8B6914),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ছবির গুণগত মান সম্পর্কে বিশেষ নির্দেশনা',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF8B6914),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'আপনার ছবিটি পত্রিকায় প্রকাশের জন্য ব্যবহৃত হবে। অনুগ্রহ করে একটি সুন্দর, স্পষ্ট এবং আনুষ্ঠানিক ছবি আপলোড করুন। ছবিতে আপনার মুখমণ্ডল স্পষ্টভাবে দৃশ্যমান হওয়া উচিত এবং পটভূমি পরিষ্কার হওয়া উচিত।',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: const Color(
+                                    0xFF8B6914,
+                                  ).withOpacity(0.8),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 30),

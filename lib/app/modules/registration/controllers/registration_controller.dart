@@ -46,6 +46,11 @@ class RegistrationController extends GetxController {
   var spouseCount = 0.obs;
   var childCount = 0.obs;
   var parentCount = 0.obs;
+
+  // Guest details - names and relationships
+  var guestNames = <String>[].obs;
+  var guestRelationships = <String>[].obs;
+
   var selectedPhoto = Rxn<PlatformFile>();
   var photoError = RxnString();
   var isRunningStudent = false.obs;
@@ -138,8 +143,20 @@ class RegistrationController extends GetxController {
     '2025',
     '2026',
   ];
+
+  // Guest relationship options
+  final List<String> guestRelationshipOptions = [
+    'স্বামী',
+    'স্ত্রী',
+    'সন্তান',
+    'পিতা',
+    'মাতা',
+    'ভাই',
+    'বোন',
+    'অন্যান্য',
+  ];
   final List<String> sscPassingYears = [
-    'None',
+  
     '1972',
     '1973',
     '1974',
@@ -215,6 +232,9 @@ class RegistrationController extends GetxController {
       const Duration(seconds: 1),
       (_) => _updateRegCountdown(),
     );
+
+    // Initialize guest details
+    _initializeGuestDetails();
   }
 
   void _updateRegCountdown() {
@@ -401,6 +421,42 @@ class RegistrationController extends GetxController {
     isRunningStudent.value = false;
     photoError.value = null;
     selectedPhoto.value = null;
+
+    // Clear guest details
+    guestNames.clear();
+    guestRelationships.clear();
+  }
+
+  void reset() {
+    nameController.clear();
+    fatherNameController.clear();
+    motherNameController.clear();
+    permanentAddressController.clear();
+    presentAddressController.clear();
+    occupationController.clear();
+    designationController.clear();
+    workplaceAddressController.clear();
+    nationalIdController.clear();
+    mobileController.clear();
+    emailController.clear();
+    selectedGender.value = 'পুরুষ';
+    selectedReligion.value = 'ইসলাম';
+    selectedNationality.value = 'বাংলাদেশী';
+    selectedFinalClass.value = '';
+    selectedYear.value = '2024';
+    selectedSscPassingYear.value = 'None';
+    selectedDateOfBirth.value = null;
+    spouseCount.value = 0;
+    childCount.value = 0;
+    parentCount.value = 0;
+    selectedTshirtSize.value = '';
+    isRunningStudent.value = false;
+    photoError.value = null;
+    selectedPhoto.value = null;
+
+    // Clear guest details
+    guestNames.clear();
+    guestRelationships.clear();
   }
 
   Future<void> saveRegistration() async {
@@ -441,6 +497,22 @@ class RegistrationController extends GetxController {
         colorText: Colors.white,
       );
       return;
+    }
+
+    // Validate guest names if guests are added
+    final totalGuests = spouseCount.value + childCount.value;
+    if (totalGuests > 0) {
+      for (int i = 0; i < totalGuests; i++) {
+        if (i < guestNames.length && guestNames[i].trim().isEmpty) {
+          Get.snackbar(
+            'ত্রুটি',
+            'অনুগ্রহ করে সব অতিথির নাম পূরণ করুন',
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
     }
 
     final batch =
@@ -689,6 +761,8 @@ class RegistrationController extends GetxController {
       'registrationTimestamp': DateTime.now().toIso8601String(),
       'totalPayable': totalPayable,
       'paymentStatus': 'pending',
+      'guestNames': guestNames.toList(),
+      'guestRelationships': guestRelationships.toList(),
     };
   }
 
@@ -721,6 +795,39 @@ class RegistrationController extends GetxController {
     isRunningStudent.value = false;
     photoError.value = null;
     selectedPhoto.value = null;
+
+    // Initialize guest details for demo
+    _initializeGuestDetails();
+  }
+
+  // Initialize guest details based on current counts
+  void _initializeGuestDetails() {
+    final totalGuests = spouseCount.value + childCount.value;
+    guestNames.clear();
+    guestRelationships.clear();
+
+    for (int i = 0; i < totalGuests; i++) {
+      guestNames.add('');
+      guestRelationships.add('স্বামী'); // Default relationship
+    }
+  }
+
+  // Update guest details when count changes
+  void updateGuestDetails() {
+    final totalGuests = spouseCount.value + childCount.value;
+
+    // If adding guests
+    if (guestNames.length < totalGuests) {
+      for (int i = guestNames.length; i < totalGuests; i++) {
+        guestNames.add('');
+        guestRelationships.add('স্বামী'); // Default relationship
+      }
+    }
+    // If removing guests
+    else if (guestNames.length > totalGuests) {
+      guestNames.removeRange(totalGuests, guestNames.length);
+      guestRelationships.removeRange(totalGuests, guestRelationships.length);
+    }
   }
 
   // Test PDF generation method

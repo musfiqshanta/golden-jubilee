@@ -114,7 +114,7 @@ class PdfService {
                                   'জাহাজমারা উচ্চ বিদ্যালয়'.fix(),
                                   style: pw.TextStyle(
                                     font: useFont,
-                                    fontSize: 14,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
@@ -204,7 +204,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -259,7 +259,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -328,7 +328,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -339,10 +339,7 @@ class PdfService {
                                     useFont2,
                                     useFont,
                                   ),
-                                  _twoLineFieldEnglish(
-                                    'Email:',
-                                    (data['email'] ?? '').toString(),
-                                  ),
+
                                   _twoLineField(
                                     'স্থায়ী ঠিকানা:',
                                     (data['permanentAddress'] ?? '').toString(),
@@ -352,6 +349,12 @@ class PdfService {
                                   _twoLineField(
                                     'বর্তমান ঠিকানা:',
                                     (data['presentAddress'] ?? '').toString(),
+                                    useFont2,
+                                    useFont,
+                                  ),
+                                  _twoLineField(
+                                    'ধর্ম:',
+                                    (data['religion'] ?? '').toString(),
                                     useFont2,
                                     useFont,
                                   ),
@@ -370,7 +373,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -393,18 +396,7 @@ class PdfService {
                                     useFont2,
                                     useFont,
                                   ),
-                                  _twoLineField(
-                                    'ধর্ম:',
-                                    (data['religion'] ?? '').toString(),
-                                    useFont2,
-                                    useFont,
-                                  ),
-                                  _twoLineField(
-                                    'অতিথি:',
-                                    totalGuest.toString(),
-                                    useFont2,
-                                    useFont,
-                                  ),
+
                                   _twoLineField(
                                     'মোট টাকা:',
                                     totalAmount.toString(),
@@ -418,7 +410,67 @@ class PdfService {
                         ),
                       ],
                     ),
-                    pw.SizedBox(height: 30),
+
+                    // Full-width guest information row
+                    if (data['guestNames'] != null &&
+                        data['guestNames'] is List &&
+                        (data['guestNames'] as List).isNotEmpty) ...[
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.grey50,
+                          border: pw.Border.all(
+                            color: PdfColors.grey300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'অতিথির বিবরণ: (${totalGuest.toString()})'.fix(),
+                              style: pw.TextStyle(
+                                font: useFont2,
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 12,
+                                color: PdfColors.amber800,
+                              ),
+                            ),
+                            pw.SizedBox(width: 8),
+                            ...List.generate(
+                              (data['guestNames'] as List).length,
+                              (index) {
+                                final guestName =
+                                    (data['guestNames'] as List)[index] ?? '';
+                                final guestRelationship =
+                                    (data['guestRelationships']
+                                        as List)[index] ??
+                                    '';
+                                if (guestName.isNotEmpty) {
+                                  return pw.Padding(
+                                    padding: pw.EdgeInsets.only(right: 16),
+                                    child: pw.Text(
+                                      '${index + 1}. ${guestName} (${guestRelationship})'
+                                          .fix(),
+                                      style: pw.TextStyle(
+                                        font: useFont,
+                                        fontSize: 10,
+                                        color: PdfColors.black,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return pw.SizedBox.shrink();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(height: 20),
+                    ],
+                    pw.SizedBox(height: 10),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
@@ -539,14 +591,10 @@ class PdfService {
                                       (data['mobile'] ?? '').toString(),
                                       useFont2,
                                     ),
-                                    _ackLine(
-                                      'লিঙ্গ:',
-                                      (data['gender'] ?? '').toString(),
-                                      useFont,
-                                    ),
                                   ],
                                 ),
                               ),
+
                               // Right column
                               pw.SizedBox(
                                 width: 250,
@@ -568,10 +616,11 @@ class PdfService {
                                         useFont2,
                                       ),
                                     _ackLine(
-                                      'অতিথি:',
-                                      totalGuest.toString(),
-                                      useFont2,
+                                      'লিঙ্গ:',
+                                      (data['gender'] ?? '').toString(),
+                                      useFont,
                                     ),
+                                    // Display detailed guest information in acknowledgment
                                     _ackLineEng(
                                       'Tshirt Size:',
                                       (data['tshirtSize'] ?? '').toString(),
@@ -589,8 +638,66 @@ class PdfService {
                         ],
                       ),
                     ),
-
-                    pw.SizedBox(height: 30),
+                    // Full-width guest information row
+                    if (data['guestNames'] != null &&
+                        data['guestNames'] is List &&
+                        (data['guestNames'] as List).isNotEmpty) ...[
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.grey50,
+                          border: pw.Border.all(
+                            color: PdfColors.grey300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'অতিথির বিবরণ:  (${totalGuest.toString()})'.fix(),
+                              style: pw.TextStyle(
+                                font: useFont2,
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 12,
+                                color: PdfColors.amber800,
+                              ),
+                            ),
+                            pw.SizedBox(width: 8),
+                            ...List.generate(
+                              (data['guestNames'] as List).length,
+                              (index) {
+                                final guestName =
+                                    (data['guestNames'] as List)[index] ?? '';
+                                final guestRelationship =
+                                    (data['guestRelationships']
+                                        as List)[index] ??
+                                    '';
+                                if (guestName.isNotEmpty) {
+                                  return pw.Padding(
+                                    padding: pw.EdgeInsets.only(right: 16),
+                                    child: pw.Text(
+                                      '${index + 1}. ${guestName} (${guestRelationship})'
+                                          .fix(),
+                                      style: pw.TextStyle(
+                                        font: useFont,
+                                        fontSize: 10,
+                                        color: PdfColors.black,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return pw.SizedBox.shrink();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(height: 20),
+                    ],
+                    pw.SizedBox(height: 20),
                     pw.Column(
                       children: [
                         pw.Row(
@@ -718,7 +825,7 @@ class PdfService {
             label.fix(),
             style: pw.TextStyle(
               font: font,
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: pw.FontWeight.bold,
             ),
           ),
@@ -728,7 +835,7 @@ class PdfService {
           width: 140,
           child: pw.Text(
             value.fix(),
-            style: pw.TextStyle(font: font, fontSize: 14),
+            style: pw.TextStyle(font: font, fontSize: 12),
             softWrap: true,
           ),
         ),
@@ -742,12 +849,12 @@ class PdfService {
       children: [
         pw.SizedBox(
           width: 100,
-          child: pw.Text(label, style: pw.TextStyle(fontSize: 14)),
+          child: pw.Text(label, style: pw.TextStyle(fontSize: 12)),
         ),
         pw.SizedBox(width: 10),
         pw.SizedBox(
           width: 140,
-          child: pw.Text(value, style: pw.TextStyle(fontSize: 14)),
+          child: pw.Text(value, style: pw.TextStyle(fontSize: 12)),
         ),
       ],
     );
@@ -763,7 +870,7 @@ class PdfService {
             label.fix(),
             style: pw.TextStyle(
               font: font,
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: pw.FontWeight.bold,
             ),
           ),
@@ -773,7 +880,7 @@ class PdfService {
           width: 140,
           child: pw.Text(
             value.fix(),
-            style: pw.TextStyle(font: font, fontSize: 14),
+            style: pw.TextStyle(font: font, fontSize: 12),
             softWrap: true,
           ),
         ),
@@ -787,12 +894,12 @@ class PdfService {
       children: [
         pw.SizedBox(
           width: 100,
-          child: pw.Text(label.fix(), style: pw.TextStyle(fontSize: 14)),
+          child: pw.Text(label.fix(), style: pw.TextStyle(fontSize: 12)),
         ),
         pw.SizedBox(width: 10),
         pw.SizedBox(
           width: 140,
-          child: pw.Text(value.fix(), style: pw.TextStyle(fontSize: 14)),
+          child: pw.Text(value.fix(), style: pw.TextStyle(fontSize: 12)),
         ),
       ],
     );
@@ -904,7 +1011,7 @@ class PdfService {
                                   'অনুদানের রসিদ'.fix(),
                                   style: pw.TextStyle(
                                     font: useFont,
-                                    fontSize: 14,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
@@ -989,7 +1096,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -1032,7 +1139,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -1085,7 +1192,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),
@@ -1111,7 +1218,7 @@ class PdfService {
                                     style: pw.TextStyle(
                                       font: useFont2,
                                       fontWeight: pw.FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: PdfColors.amber800,
                                     ),
                                   ),

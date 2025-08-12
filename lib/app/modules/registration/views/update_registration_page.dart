@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:convert';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
   final String phone;
   final Map<String, dynamic> registrationData;
+
   const UpdateRegistrationPage({
     super.key,
     required this.batchId,
@@ -20,6 +25,8 @@ class UpdateRegistrationPage extends StatefulWidget {
 
 class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+
+  // Controllers
   late TextEditingController nameController;
   late TextEditingController fatherNameController;
   late TextEditingController motherNameController;
@@ -29,25 +36,206 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   late TextEditingController designationController;
   late TextEditingController permanentAddressController;
   late TextEditingController presentAddressController;
-  late TextEditingController tshirtSizeController;
-  late TextEditingController spouseCountController;
-  late TextEditingController childCountController;
-  late TextEditingController sscPassingYearController;
-  late TextEditingController finalClassController;
-  late TextEditingController yearController;
+  late TextEditingController workplaceAddressController;
+  late TextEditingController nationalIdController;
+
+  // Photo related
+  PlatformFile? selectedPhoto;
+  String? photoError;
+  String? currentPhotoUrl;
+
+  // Dropdown values
   String? gender;
   String? nationality;
   String? religion;
+  String? bloodGroup;
+  String? tshirtSize;
+  String? finalClass;
+  String? year;
+  String? sscPassingYear;
+
+  // Checkboxes
   bool isRunningStudent = false;
   bool isStillStudying = false;
-  bool isLoading = false;
+
+  // Guest counts
   int spouseCount = 0;
   int childCount = 0;
+
+  // Guest details
+  List<String> guestNames = [];
+  List<String> guestRelationships = [];
+
+  // Loading state
+  bool isLoading = false;
+  bool isDeleting = false;
+
+  // Dropdown lists
+  final List<String> tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
+  final List<String> religions = [
+    'ইসলাম',
+    'হিন্দু',
+    'খ্রিস্টান',
+    'বৌদ্ধ',
+    'অন্যান্য',
+  ];
+  final List<String> nationalities = ['বাংলাদেশী', 'অন্যান্য'];
+  final List<String> bloodGroups = [
+    'জানি না / জানা নেই',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
+  ];
+  final List<String> finalClasses = [
+    '৬ষ্ঠ শ্রেণি',
+    '৭ম শ্রেণি',
+    '৮ম শ্রেণি',
+    '৯ম শ্রেণি',
+    '১০ম শ্রেণি',
+  ];
+  final List<String> years = [
+    '1972',
+    '1973',
+    '1974',
+    '1975',
+    '1976',
+    '1977',
+    '1978',
+    '1979',
+    '1980',
+    '1981',
+    '1982',
+    '1983',
+    '1984',
+    '1985',
+    '1986',
+    '1987',
+    '1988',
+    '1989',
+    '1990',
+    '1991',
+    '1992',
+    '1993',
+    '1994',
+    '1995',
+    '1996',
+    '1997',
+    '1998',
+    '1999',
+    '2000',
+    '2001',
+    '2002',
+    '2003',
+    '2004',
+    '2005',
+    '2006',
+    '2007',
+    '2008',
+    '2009',
+    '2010',
+    '2011',
+    '2012',
+    '2013',
+    '2014',
+    '2015',
+    '2016',
+    '2017',
+    '2018',
+    '2019',
+    '2020',
+    '2021',
+    '2022',
+    '2023',
+    '2024',
+    '2025',
+    '2026',
+  ];
+  final List<String> sscPassingYears = [
+    'None',
+    '1972',
+    '1973',
+    '1974',
+    '1975',
+    '1976',
+    '1977',
+    '1978',
+    '1979',
+    '1980',
+    '1981',
+    '1982',
+    '1983',
+    '1984',
+    '1985',
+    '1986',
+    '1987',
+    '1988',
+    '1989',
+    '1990',
+    '1991',
+    '1992',
+    '1993',
+    '1994',
+    '1995',
+    '1996',
+    '1997',
+    '1998',
+    '1999',
+    '2000',
+    '2001',
+    '2002',
+    '2003',
+    '2004',
+    '2005',
+    '2006',
+    '2007',
+    '2008',
+    '2009',
+    '2010',
+    '2011',
+    '2012',
+    '2013',
+    '2014',
+    '2015',
+    '2016',
+    '2017',
+    '2018',
+    '2019',
+    '2020',
+    '2021',
+    '2022',
+    '2023',
+    '2024',
+    '2025',
+    '2026',
+  ];
+
+  // Guest relationship options
+  final List<String> guestRelationshipOptions = [
+    'স্বামী',
+    'স্ত্রী',
+    'সন্তান',
+    'পিতা',
+    'মাতা',
+    'ভাই',
+    'বোন',
+    'অন্যান্য',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _initializeControllers();
+    _initializeGuestDetails();
+  }
+
+  void _initializeControllers() {
     final d = widget.registrationData;
+
     nameController = TextEditingController(text: d['name'] ?? '');
     fatherNameController = TextEditingController(text: d['fatherName'] ?? '');
     motherNameController = TextEditingController(text: d['motherName'] ?? '');
@@ -61,18 +249,15 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     presentAddressController = TextEditingController(
       text: d['presentAddress'] ?? '',
     );
-    tshirtSizeController = TextEditingController(text: d['tshirtSize'] ?? '');
-    spouseCountController = TextEditingController(
-      text: (d['spouseCount'] ?? 0).toString(),
+    workplaceAddressController = TextEditingController(
+      text: d['workplaceAddress'] ?? '',
     );
-    childCountController = TextEditingController(
-      text: (d['childCount'] ?? 0).toString(),
-    );
-    sscPassingYearController = TextEditingController(
-      text: d['sscPassingYear'] ?? '',
-    );
-    finalClassController = TextEditingController(text: d['finalClass'] ?? '');
-    yearController = TextEditingController(text: d['year'] ?? '');
+    nationalIdController = TextEditingController(text: d['nationalId'] ?? '');
+
+    // Photo
+    currentPhotoUrl = d['photoUrl'];
+
+    // Dropdowns
     gender = d['gender'] ?? 'পুরুষ';
     nationality =
         (d['nationality'] == 'Other')
@@ -80,10 +265,122 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             : (d['nationality'] ?? 'বাংলাদেশী');
     religion =
         (d['religion'] == 'Other') ? 'অন্যান্য' : (d['religion'] ?? 'ইসলাম');
+    bloodGroup = d['bloodGroup'] ?? 'জানি না / জানা নেই';
+    tshirtSize = d['tshirtSize'] ?? '';
+    finalClass = d['finalClass'] ?? '';
+    year = d['year'] ?? '2024';
+    sscPassingYear = d['sscPassingYear'] ?? 'None';
+
+    // Checkboxes
     isRunningStudent = d['isRunningStudent'] == true;
     isStillStudying = d['isStillStudying'] == true;
+
+    // Guest counts
     spouseCount = d['spouseCount'] ?? 0;
     childCount = d['childCount'] ?? 0;
+
+    // Guest details
+    guestNames = List<String>.from(d['guestNames'] ?? []);
+    guestRelationships = List<String>.from(d['guestRelationships'] ?? []);
+  }
+
+  void _initializeGuestDetails() {
+    final totalGuests = spouseCount + childCount;
+
+    // Ensure guest lists have the right length
+    while (guestNames.length < totalGuests) {
+      guestNames.add('');
+    }
+    while (guestRelationships.length < totalGuests) {
+      guestRelationships.add('স্বামী');
+    }
+
+    // Trim lists if they're too long
+    if (guestNames.length > totalGuests) {
+      guestNames = guestNames.take(totalGuests).toList();
+    }
+    if (guestRelationships.length > totalGuests) {
+      guestRelationships = guestRelationships.take(totalGuests).toList();
+    }
+  }
+
+  void _updateGuestDetails() {
+    final totalGuests = spouseCount + childCount;
+    _initializeGuestDetails();
+    setState(() {});
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+
+        if (file.size > 3 * 1024 * 1024) {
+          // 3MB limit
+          setState(() {
+            photoError = 'File size must be less than 3MB';
+            selectedPhoto = null;
+          });
+          return;
+        }
+
+        setState(() {
+          selectedPhoto = file;
+          photoError = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        photoError = 'Error selecting photo: $e';
+        selectedPhoto = null;
+      });
+    }
+  }
+
+  Future<String?> _uploadPhoto(File imageFile) async {
+    try {
+      print('Uploading photo...');
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://subornojoyonti.com/api/upload'),
+      );
+
+      if (selectedPhoto != null && selectedPhoto!.bytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            selectedPhoto!.bytes!,
+            filename: selectedPhoto!.name,
+          ),
+        );
+      } else if (selectedPhoto != null &&
+          selectedPhoto!.path != null &&
+          selectedPhoto!.path!.isNotEmpty) {
+        request.files.add(
+          await http.MultipartFile.fromPath('file', selectedPhoto!.path!),
+        );
+      }
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(responseData);
+        return jsonData['url'];
+      } else {
+        print('Upload failed: ${response.statusCode} - $responseData');
+        return null;
+      }
+    } catch (e) {
+      print('Error uploading photo: $e');
+      return null;
+    }
   }
 
   @override
@@ -97,23 +394,18 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     designationController.dispose();
     permanentAddressController.dispose();
     presentAddressController.dispose();
-    tshirtSizeController.dispose();
-    spouseCountController.dispose();
-    childCountController.dispose();
-    sscPassingYearController.dispose();
-    finalClassController.dispose();
-    yearController.dispose();
+    workplaceAddressController.dispose();
+    nationalIdController.dispose();
     super.dispose();
   }
 
   Future<void> _updateRegistration() async {
-    print('Update registration started');
     if (!_formKey.currentState!.validate()) {
-      print('Form validation failed');
       return;
     }
-    print('Form validation passed, starting update...');
+
     setState(() => isLoading = true);
+
     try {
       // Calculate total payable amount
       final int baseFee = _calculateBaseFee();
@@ -121,9 +413,21 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       final int guestFee = guestCount * 500;
       final int totalPayable = baseFee + guestFee;
 
-      print('Calculated base fee: $baseFee');
-      print('Guest count: $guestCount, Guest fee: $guestFee');
-      print('Total payable: $totalPayable');
+      // Handle photo upload
+      String? photoUrl = currentPhotoUrl;
+      if (selectedPhoto != null) {
+        photoUrl = await _uploadPhoto(File(''));
+        if (photoUrl == null) {
+          setState(() => isLoading = false);
+          Get.snackbar(
+            'ত্রুটি',
+            'ছবি আপলোড ব্যর্থ হয়েছে',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
 
       final data = {
         'name': nameController.text.trim(),
@@ -135,24 +439,30 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'designation': designationController.text.trim(),
         'permanentAddress': permanentAddressController.text.trim(),
         'presentAddress': presentAddressController.text.trim(),
-        'tshirtSize': tshirtSizeController.text.trim(),
-        'spouseCount': spouseCount,
-        'childCount': childCount,
-        'sscPassingYear': sscPassingYearController.text.trim(),
-        'finalClass': finalClassController.text.trim(),
-        'year': yearController.text.trim(),
+        'workplaceAddress': workplaceAddressController.text.trim(),
+        'nationalId': nationalIdController.text.trim(),
         'gender': gender,
         'nationality': nationality,
         'religion': religion,
+        'bloodGroup': bloodGroup,
+        'tshirtSize': tshirtSize,
+        'spouseCount': spouseCount,
+        'childCount': childCount,
+        'guestNames': guestNames,
+        'guestRelationships': guestRelationships,
+        'sscPassingYear': sscPassingYear,
+        'finalClass': finalClass,
+        'year': year,
         'isRunningStudent': isRunningStudent,
         'isStillStudying': isStillStudying,
         'batch': widget.batchId,
         'totalPayable': totalPayable,
-        // Keep other fields as is if needed
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      print('Data to update: $data');
-      print('Updating Firestore document...');
+      if (photoUrl != null) {
+        data['photoUrl'] = photoUrl;
+      }
 
       await FirebaseFirestore.instance
           .collection(CollectionConfig.batchesCollection)
@@ -164,14 +474,15 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             Get.back(result: true);
           });
 
-      print('Firestore update completed successfully');
       setState(() => isLoading = false);
 
-      // Go back and refresh the previous screen
-      print('Returning with result: true');
-      // Pass result to indicate successful update
+      Get.snackbar(
+        'সফল',
+        'তথ্য সফলভাবে আপডেট হয়েছে',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (e) {
-      print('Error during update: $e');
       setState(() => isLoading = false);
       Get.snackbar(
         'ত্রুটি',
@@ -179,6 +490,79 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+    }
+  }
+
+  Future<void> _deleteRegistration() async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('নিবন্ধন মুছে ফেলুন'),
+        content: const Text(
+          'আপনি কি নিশ্চিত যে আপনি এই নিবন্ধনটি মুছে ফেলতে চান? এই কাজটি অপরিবর্তনীয়।',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('না'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('হ্যাঁ, মুছে ফেলুন'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => isDeleting = true);
+
+    try {
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(widget.batchId)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(widget.phone)
+          .delete()
+          .then((onValue) {
+            Get.back(result: true);
+          });
+
+      setState(() => isDeleting = false);
+
+      Get.snackbar(
+        'সফল',
+        'নিবন্ধন সফলভাবে মুছে ফেলা হয়েছে',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      Get.back(result: 'deleted');
+    } catch (e) {
+      setState(() => isDeleting = false);
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন মুছে ফেলা ব্যর্থ: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  int _calculateBaseFee() {
+    if (isRunningStudent) {
+      return 500; // Running students pay 500
+    } else {
+      // For old students, check if they passed between 2019-2026
+      final passingYear = sscPassingYear ?? 'None';
+      if (passingYear != 'None') {
+        final year = int.tryParse(passingYear);
+        if (year != null && year >= 2019 && year <= 2026) {
+          return 700; // Old students who passed 2019-2026 pay 700
+        }
+      }
+      return 1200; // Other old students pay 1200
     }
   }
 
@@ -192,318 +576,801 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         ),
         backgroundColor: const Color(0xFFD4AF37),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          // Delete button
+          IconButton(
+            onPressed: isDeleting ? null : _deleteRegistration,
+            icon:
+                isDeleting
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                    : const Icon(Icons.delete_forever, color: Colors.white),
+            tooltip: 'নিবন্ধন মুছে ফেলুন',
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'নাম'),
-                validator: (v) => v == null || v.isEmpty ? 'নাম আবশ্যক' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: fatherNameController,
-                decoration: const InputDecoration(labelText: 'পিতার নাম'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: motherNameController,
-                decoration: const InputDecoration(labelText: 'মাতার নাম'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: mobileController,
-                decoration: const InputDecoration(labelText: 'মোবাইল'),
-                keyboardType: TextInputType.phone,
-                enabled: false, // Phone number should not be changed
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'ইমেইল'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: gender,
-                      decoration: const InputDecoration(labelText: 'লিঙ্গ'),
-                      items: const [
-                        DropdownMenuItem(value: 'পুরুষ', child: Text('পুরুষ')),
-                        DropdownMenuItem(value: 'মহিলা', child: Text('মহিলা')),
-                        DropdownMenuItem(
-                          value: 'অন্যান্য',
-                          child: Text('অন্যান্য'),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => gender = v),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFD4AF37), Colors.white],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Personal Information Section
+                _sectionCard('ব্যক্তিগত তথ্য', Icons.person, [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'নাম *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    validator:
+                        (v) => v == null || v.isEmpty ? 'নাম আবশ্যক' : null,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: nationality,
-                      decoration: const InputDecoration(labelText: 'জাতীয়তা'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'বাংলাদেশী',
-                          child: Text('বাংলাদেশী'),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: fatherNameController,
+                          decoration: InputDecoration(
+                            labelText: 'পিতার নাম',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'অন্যান্য',
-                          child: Text('অন্যান্য'),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: TextFormField(
+                          controller: motherNameController,
+                          decoration: InputDecoration(
+                            labelText: 'মাতার নাম',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         ),
-                      ],
-                      onChanged: (v) => setState(() => nationality = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _dropdownField('লিঙ্গ *', gender, [
+                          'পুরুষ',
+                          'মহিলা',
+                          'অন্যান্য',
+                        ], (value) => setState(() => gender = value)),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: _dropdownField(
+                          'জাতীয়তা *',
+                          nationality,
+                          nationalities,
+                          (value) => setState(() => nationality = value),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _dropdownField(
+                          'ধর্ম *',
+                          religion,
+                          religions,
+                          (value) => setState(() => religion = value),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: _dropdownField(
+                          'রক্তের গ্রুপ',
+                          bloodGroup,
+                          bloodGroups,
+                          (value) => setState(() => bloodGroup = value),
+                        ),
+                      ),
+                    ],
+                  ),
+                ]),
+
+                const SizedBox(height: 20),
+
+                // Contact Information Section
+                _sectionCard('যোগাযোগের তথ্য', Icons.contact_phone, [
+                  TextFormField(
+                    controller: mobileController,
+                    decoration: InputDecoration(
+                      labelText: 'মোবাইল *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    keyboardType: TextInputType.phone,
+                    enabled: false, // Phone number should not be changed
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: religion,
-                      decoration: const InputDecoration(labelText: 'ধর্ম'),
-                      items: const [
-                        DropdownMenuItem(value: 'ইসলাম', child: Text('ইসলাম')),
-                        DropdownMenuItem(
-                          value: 'হিন্দু',
-                          child: Text('হিন্দু'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'খ্রিস্টান',
-                          child: Text('খ্রিস্টান'),
-                        ),
-                        DropdownMenuItem(value: 'বৌদ্ধ', child: Text('বৌদ্ধ')),
-                        DropdownMenuItem(
-                          value: 'অন্যান্য',
-                          child: Text('অন্যান্য'),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => religion = v),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: InputDecoration(
+                      labelText: 'ইমেইল',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: occupationController,
-                      decoration: const InputDecoration(
-                        labelText: 'পেশা (ঐচ্ছিক)',
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: nationalIdController,
+                    decoration: InputDecoration(
+                      labelText: 'জাতীয় পরিচয়পত্র নম্বর',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: designationController,
-                decoration: const InputDecoration(labelText: 'পদবী (ঐচ্ছিক)'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Checkbox(
-                    value: isStillStudying,
-                    onChanged:
-                        (val) => setState(() => isStillStudying = val ?? false),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'বর্তমানে অধ্যয়নরত',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
+                ]),
 
-              TextFormField(
-                controller: permanentAddressController,
-                decoration: const InputDecoration(labelText: 'স্থায়ী ঠিকানা'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: presentAddressController,
-                decoration: const InputDecoration(labelText: 'বর্তমান ঠিকানা'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: tshirtSizeController,
-                decoration: const InputDecoration(labelText: 'টি-শার্ট সাইজ'),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _customNumberField(
-                      label: 'স্বামী/স্ত্রী/সন্তান',
-                      value: spouseCount,
-                      maxValue: 3,
-                      onChanged: (value) {
-                        final newTotal = value + childCount;
-                        if (newTotal <= 3) {
-                          setState(() {
-                            spouseCount = value;
-                            spouseCountController.text = value.toString();
-                          });
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
-                              ),
-                              backgroundColor: Colors.orange,
-                              duration: Duration(seconds: 2),
+                const SizedBox(height: 20),
+
+                // Address Information Section
+                _sectionCard('ঠিকানার তথ্য', Icons.location_on, [
+                  TextFormField(
+                    controller: permanentAddressController,
+                    decoration: InputDecoration(
+                      labelText: 'স্থায়ী ঠিকানা *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 2,
+                    validator:
+                        (v) =>
+                            v == null || v.isEmpty
+                                ? 'স্থায়ী ঠিকানা আবশ্যক'
+                                : null,
+                  ),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: presentAddressController,
+                    decoration: InputDecoration(
+                      labelText: 'বর্তমান ঠিকানা *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 2,
+                    validator:
+                        (v) =>
+                            v == null || v.isEmpty
+                                ? 'বর্তমান ঠিকানা আবশ্যক'
+                                : null,
+                  ),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: workplaceAddressController,
+                    decoration: InputDecoration(
+                      labelText: 'কর্মস্থলের ঠিকানা',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 2,
+                  ),
+                ]),
+
+                const SizedBox(height: 20),
+
+                // Professional Information Section
+                _sectionCard('পেশাগত তথ্য', Icons.work, [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: occupationController,
+                          decoration: InputDecoration(
+                            labelText: 'পেশা',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _customNumberField(
-                      label: 'অন্যান্য আতিথী',
-                      value: childCount,
-                      maxValue: 3,
-                      onChanged: (value) {
-                        final newTotal = spouseCount + value;
-                        if (newTotal <= 3) {
-                          setState(() {
-                            childCount = value;
-                            childCountController.text = value.toString();
-                          });
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
-                              ),
-                              backgroundColor: Colors.orange,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4AF37).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFFD4AF37).withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: const Color(0xFFD4AF37),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'মোট অতিথি: ${spouseCount + childCount} জন (সর্বোচ্চ ৩ জন)',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF8B6914),
-                          fontWeight: FontWeight.w500,
+                          ),
                         ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: TextFormField(
+                          controller: designationController,
+                          decoration: InputDecoration(
+                            labelText: 'পদবী',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ]),
+
+                const SizedBox(height: 20),
+
+                // Educational Information Section
+                _sectionCard('শিক্ষাগত তথ্য', Icons.school, [
+                  // Note about educational details being read-only
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'শিক্ষাগত তথ্য শুধুমাত্র দেখার জন্য - পরিবর্তন করা যাবে না',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue[700],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isRunningStudent,
+                        onChanged: null, // Disabled
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'বর্তমানে অধ্যয়নরত',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color:
+                                Colors
+                                    .grey[600], // Dimmed text to show it's disabled
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (isRunningStudent) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _dropdownField(
+                            'বর্তমান শ্রেণি',
+                            finalClass,
+                            finalClasses,
+                            (value) {}, // Disabled - no action
+                            enabled: false,
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _dropdownField(
+                            'সাল',
+                            year,
+                            years,
+                            (value) {}, // Disabled - no action
+                            enabled: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _dropdownField(
+                      'এসএসসি পাসের সাল',
+                      sscPassingYear,
+                      sscPassingYears,
+                      (value) {}, // Disabled - no action
+                      enabled: false,
+                    ),
+                  ],
+                ]),
+
+                const SizedBox(height: 20),
+
+                // Guest Information Section
+                _sectionCard('অতিথির তথ্য', Icons.people, [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _customNumberField(
+                          label: 'স্বামী/স্ত্রী/সন্তান',
+                          value: spouseCount,
+                          maxValue: 3,
+                          onChanged: (value) {
+                            final newTotal = value + childCount;
+                            if (newTotal <= 3) {
+                              setState(() {
+                                spouseCount = value;
+                                _updateGuestDetails();
+                              });
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                                  ),
+                                  backgroundColor: Colors.orange,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: _customNumberField(
+                          label: 'অন্যান্য আতিথী',
+                          value: childCount,
+                          maxValue: 3,
+                          onChanged: (value) {
+                            final newTotal = spouseCount + value;
+                            if (newTotal <= 3) {
+                              setState(() {
+                                childCount = value;
+                                _updateGuestDetails();
+                              });
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                                  ),
+                                  backgroundColor: Colors.orange,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  // Guest Details Input Fields
+                  if (spouseCount + childCount > 0) ...[
+                    Text(
+                      'অতিথির বিবরণ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF8B6914),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...List.generate(spouseCount + childCount, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                decoration: InputDecoration(
+                                  labelText: 'অতিথি ${index + 1} এর নাম',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  if (index < guestNames.length) {
+                                    guestNames[index] = value;
+                                  }
+                                },
+                                controller: TextEditingController(
+                                  text:
+                                      index < guestNames.length
+                                          ? guestNames[index]
+                                          : '',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                decoration: InputDecoration(
+                                  labelText: 'সম্পর্ক',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                value:
+                                    index < guestRelationships.length
+                                        ? guestRelationships[index]
+                                        : 'স্বামী',
+                                items:
+                                    guestRelationshipOptions.map((
+                                      relationship,
+                                    ) {
+                                      return DropdownMenuItem<String>(
+                                        value: relationship,
+                                        child: Text(relationship),
+                                      );
+                                    }).toList(),
+                                onChanged: (value) {
+                                  if (value != null &&
+                                      index < guestRelationships.length) {
+                                    guestRelationships[index] = value;
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ]),
+
+                const SizedBox(height: 20),
+
+                // T-shirt Size Section
+                _sectionCard('টি-শার্ট সাইজ', Icons.checkroom, [
+                  _dropdownField(
+                    'টি-শার্ট সাইজ *',
+                    tshirtSize,
+                    tshirtSizes,
+                    (value) => setState(() => tshirtSize = value),
+                  ),
+                ]),
+
+                const SizedBox(height: 20),
+
+                // Photo Upload Section
+                _sectionCard('ছবি আপলোড', Icons.camera_alt, [
+                  GestureDetector(
+                    onTap: _pickPhoto,
+                    child: Container(
+                      width: double.infinity,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color:
+                              photoError != null
+                                  ? Colors.red
+                                  : const Color(0xFFD4AF37),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.grey[100],
+                      ),
+                      child:
+                          (selectedPhoto != null &&
+                                  selectedPhoto!.bytes != null)
+                              ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.memory(
+                                  selectedPhoto!.bytes!,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
+                              )
+                              : (currentPhotoUrl != null &&
+                                  currentPhotoUrl!.isNotEmpty)
+                              ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  currentPhotoUrl!,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return _buildPhotoPlaceholder();
+                                  },
+                                ),
+                              )
+                              : _buildPhotoPlaceholder(),
+                    ),
+                  ),
+
+                  if (photoError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        photoError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+
+                  if (selectedPhoto != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'File: ${selectedPhoto!.name}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            'Size: ${(selectedPhoto!.size / 1024).toStringAsFixed(1)} KB',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Beautiful note about photo requirements
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFD4AF37).withOpacity(0.1),
+                          const Color(0xFFD4AF37).withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.info_outline,
+                            color: Color(0xFF8B6914),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ছবির গুণগত মান সম্পর্কে বিশেষ নির্দেশনা',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF8B6914),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'আপনার ছবিটি পত্রিকায় প্রকাশের জন্য ব্যবহৃত হবে। অনুগ্রহ করে একটি সুন্দর, স্পষ্ট এবং আনুষ্ঠানিক ছবি আপলোড করুন। ছবিতে আপনার মুখমণ্ডল স্পষ্টভাবে দৃশ্যমান হওয়া উচিত এবং পটভূমি পরিষ্কার হওয়া উচিত।',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: const Color(
+                                    0xFF8B6914,
+                                  ).withOpacity(0.8),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ]),
+
+                const SizedBox(height: 30),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    // Delete Button
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: isDeleting ? null : _deleteRegistration,
+                        icon:
+                            isDeleting
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : const Icon(Icons.delete_forever),
+                        label: Text(
+                          isDeleting ? 'মুছে ফেলছি...' : 'নিবন্ধন মুছে ফেলুন',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    // Update Button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _updateRegistration,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD4AF37),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child:
+                            isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : const Text(
+                                  'তথ্য আপডেট করুন',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              if (isRunningStudent) ...[
-                TextFormField(
-                  controller: finalClassController,
-                  decoration: InputDecoration(
-                    labelText: 'বর্তমান শ্রেণি',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                  ),
-                  enabled: false,
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: yearController,
-                  decoration: InputDecoration(
-                    labelText: 'সাল',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                  ),
-                  enabled: false,
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ] else ...[
-                TextFormField(
-                  controller: sscPassingYearController,
-                  decoration: InputDecoration(
-                    labelText: 'এসএসসি পাসের সাল',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                  ),
-                  enabled: false,
-                  style: const TextStyle(color: Colors.grey),
-                ),
+                const SizedBox(height: 20),
               ],
-              const SizedBox(height: 20),
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : _updateRegistration,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child:
-                        isLoading
-                            ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                            : const Text(
-                              'তথ্য আপডেট করুন',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.add_a_photo, size: 40, color: Color(0xFFD4AF37)),
+        const SizedBox(height: 8),
+        const Text(
+          'ছবি আপলোড করুন',
+          style: TextStyle(
+            color: Color(0xFFD4AF37),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'সর্বোচ্চ সাইজ: ৩ এমবি',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionCard(String title, IconData icon, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFFD4AF37), size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B6914),
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 20),
+          ...children,
+        ],
       ),
+    );
+  }
+
+  Widget _dropdownField(
+    String label,
+    String? value,
+    List<String> items,
+    void Function(String?) onChanged, {
+    bool enabled = true,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        filled: !enabled,
+        fillColor: !enabled ? Colors.grey[100] : null,
+      ),
+      items:
+          items
+              .map(
+                (item) =>
+                    DropdownMenuItem<String>(value: item, child: Text(item)),
+              )
+              .toList(),
+      onChanged: enabled ? onChanged : null,
+      style: TextStyle(color: enabled ? null : Colors.grey[600]),
     );
   }
 
@@ -574,21 +1441,5 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
           ),
       ],
     );
-  }
-
-  int _calculateBaseFee() {
-    if (isRunningStudent) {
-      return 500; // Running students pay 500
-    } else {
-      // For old students, check if they passed between 2019-2026
-      final passingYear = sscPassingYearController.text.trim();
-      if (passingYear.isNotEmpty) {
-        final year = int.tryParse(passingYear);
-        if (year != null && year >= 2019 && year <= 2026) {
-          return 700; // Old students who passed 2019-2026 pay 700
-        }
-      }
-      return 1200; // Other old students pay 1200
-    }
   }
 }
