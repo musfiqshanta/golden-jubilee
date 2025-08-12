@@ -57,8 +57,9 @@ class PdfService {
               : DateTime.now();
       final isRunningStudent = data['isRunningStudent'] == true;
       final totalGuest = (data['spouseCount'] ?? 0) + (data['childCount'] ?? 0);
-      final participantAmount = isRunningStudent ? 700 : 1200;
-      final totalAmount = participantAmount + (totalGuest * 500);
+
+      // Use the totalPayable from database instead of hardcoded calculation
+      final totalAmount = data['totalPayable'] ?? 0;
 
       final pdf = pw.Document();
       pdf.addPage(
@@ -211,7 +212,7 @@ class PdfService {
                                   _twoLineField(
                                     'নাম:',
                                     (data['name'] ?? '').toString(),
-                                    useFont2,
+                                    useFont,
                                     useFont,
                                   ),
                                   _twoLineField(
@@ -229,7 +230,7 @@ class PdfService {
                                   _twoLineField(
                                     'লিঙ্গ:',
                                     (data['gender'] ?? '').toString(),
-                                    useFont2,
+                                    useFont,
                                     useFont,
                                   ),
 
@@ -430,7 +431,7 @@ class PdfService {
                               margin: pw.EdgeInsets.only(bottom: 4),
                             ),
                             pw.Text(
-                              'গ্রহণকারীর নাম'.fix(),
+                              'ব্যাচ প্রতিনিধি স্বাক্ষর '.fix(),
                               style: pw.TextStyle(font: useFont2, fontSize: 12),
                             ),
                           ],
@@ -444,7 +445,7 @@ class PdfService {
                               margin: pw.EdgeInsets.only(bottom: 4),
                             ),
                             pw.Text(
-                              'আহবায়ক'.fix(),
+                              'আহবায়ক/সদস্য সচিব'.fix(),
                               style: pw.TextStyle(font: useFont2, fontSize: 12),
                             ),
                           ],
@@ -604,7 +605,7 @@ class PdfService {
                                   margin: pw.EdgeInsets.only(bottom: 4),
                                 ),
                                 pw.Text(
-                                  'গ্রহণকারীর নাম'.fix(),
+                                  'ব্যাচ প্রতিনিধি স্বাক্ষর '.fix(),
                                   style: pw.TextStyle(
                                     font: useFont2,
                                     fontSize: 12,
@@ -621,7 +622,7 @@ class PdfService {
                                   margin: pw.EdgeInsets.only(bottom: 4),
                                 ),
                                 pw.Text(
-                                  'আহবায়ক'.fix(),
+                                  'আহবায়ক/সদস্য সচিব'.fix(),
                                   style: pw.TextStyle(
                                     font: useFont2,
                                     fontSize: 12,
@@ -638,7 +639,7 @@ class PdfService {
                                   margin: pw.EdgeInsets.only(bottom: 4),
                                 ),
                                 pw.Text(
-                                  'আবেদনকারী'.fix(),
+                                  'অর্থ সম্পাদক'.fix(),
                                   style: pw.TextStyle(
                                     font: useFont2,
                                     fontSize: 12,
@@ -727,7 +728,7 @@ class PdfService {
           width: 140,
           child: pw.Text(
             value.fix(),
-            style: pw.TextStyle(font: font2, fontSize: 14),
+            style: pw.TextStyle(font: font, fontSize: 14),
             softWrap: true,
           ),
         ),
@@ -1161,7 +1162,7 @@ class PdfService {
                               margin: pw.EdgeInsets.only(bottom: 4),
                             ),
                             pw.Text(
-                              'গ্রহণকারীর নাম'.fix(),
+                              'গ্রহণকারী'.fix(),
                               style: pw.TextStyle(font: useFont2, fontSize: 12),
                             ),
                           ],
@@ -1175,7 +1176,7 @@ class PdfService {
                               margin: pw.EdgeInsets.only(bottom: 4),
                             ),
                             pw.Text(
-                              'আহবায়ক'.fix(),
+                              'আহবায়ক/সদস্য সচিব'.fix(),
                               style: pw.TextStyle(font: useFont2, fontSize: 12),
                             ),
                           ],

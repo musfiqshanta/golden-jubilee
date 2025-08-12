@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:suborno_joyonti/config/collection_names.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
@@ -38,7 +39,10 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   String? nationality;
   String? religion;
   bool isRunningStudent = false;
+  bool isStillStudying = false;
   bool isLoading = false;
+  int spouseCount = 0;
+  int childCount = 0;
 
   @override
   void initState() {
@@ -77,6 +81,9 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     religion =
         (d['religion'] == 'Other') ? 'অন্যান্য' : (d['religion'] ?? 'ইসলাম');
     isRunningStudent = d['isRunningStudent'] == true;
+    isStillStudying = d['isStillStudying'] == true;
+    spouseCount = d['spouseCount'] ?? 0;
+    childCount = d['childCount'] ?? 0;
   }
 
   @override
@@ -100,16 +107,23 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   }
 
   Future<void> _updateRegistration() async {
-    if (!_formKey.currentState!.validate()) return;
+    print('Update registration started');
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
+      return;
+    }
+    print('Form validation passed, starting update...');
     setState(() => isLoading = true);
     try {
       // Calculate total payable amount
-      final int baseFee = isRunningStudent ? 700 : 1200;
-      final int guestCount =
-          (int.tryParse(spouseCountController.text) ?? 0) +
-          (int.tryParse(childCountController.text) ?? 0);
+      final int baseFee = _calculateBaseFee();
+      final int guestCount = spouseCount + childCount;
       final int guestFee = guestCount * 500;
       final int totalPayable = baseFee + guestFee;
+
+      print('Calculated base fee: $baseFee');
+      print('Guest count: $guestCount, Guest fee: $guestFee');
+      print('Total payable: $totalPayable');
 
       final data = {
         'name': nameController.text.trim(),
@@ -122,8 +136,8 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'permanentAddress': permanentAddressController.text.trim(),
         'presentAddress': presentAddressController.text.trim(),
         'tshirtSize': tshirtSizeController.text.trim(),
-        'spouseCount': int.tryParse(spouseCountController.text) ?? 0,
-        'childCount': int.tryParse(childCountController.text) ?? 0,
+        'spouseCount': spouseCount,
+        'childCount': childCount,
         'sscPassingYear': sscPassingYearController.text.trim(),
         'finalClass': finalClassController.text.trim(),
         'year': yearController.text.trim(),
@@ -131,25 +145,33 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'nationality': nationality,
         'religion': religion,
         'isRunningStudent': isRunningStudent,
+        'isStillStudying': isStillStudying,
         'batch': widget.batchId,
         'totalPayable': totalPayable,
         // Keep other fields as is if needed
       };
+
+      print('Data to update: $data');
+      print('Updating Firestore document...');
+
       await FirebaseFirestore.instance
-          .collection('batches')
+          .collection(CollectionConfig.batchesCollection)
           .doc(widget.batchId)
-          .collection('registrations')
+          .collection(CollectionConfig.registrationsCollection)
           .doc(widget.phone)
-          .update(data);
+          .update(data)
+          .then((value) {
+            Get.back(result: true);
+          });
+
+      print('Firestore update completed successfully');
       setState(() => isLoading = false);
-      Get.snackbar(
-        'সফল',
-        'তথ্য আপডেট হয়েছে',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      Get.back();
+
+      // Go back and refresh the previous screen
+      print('Returning with result: true');
+      // Pass result to indicate successful update
     } catch (e) {
+      print('Error during update: $e');
       setState(() => isLoading = false);
       Get.snackbar(
         'ত্রুটি',
@@ -274,7 +296,9 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                   Expanded(
                     child: TextFormField(
                       controller: occupationController,
-                      decoration: const InputDecoration(labelText: 'পেশা'),
+                      decoration: const InputDecoration(
+                        labelText: 'পেশা (ঐচ্ছিক)',
+                      ),
                     ),
                   ),
                 ],
@@ -282,9 +306,25 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: designationController,
-                decoration: const InputDecoration(labelText: 'পদবী'),
+                decoration: const InputDecoration(labelText: 'পদবী (ঐচ্ছিক)'),
               ),
               const SizedBox(height: 10),
+              Row(
+                children: [
+                  Checkbox(
+                    value: isStillStudying,
+                    onChanged:
+                        (val) => setState(() => isStillStudying = val ?? false),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'বর্তমানে অধ্যয়নরত',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
               TextFormField(
                 controller: permanentAddressController,
                 decoration: const InputDecoration(labelText: 'স্থায়ী ঠিকানা'),
@@ -303,43 +343,124 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: spouseCountController,
-                      decoration: const InputDecoration(
-                        labelText: 'স্বামী/স্ত্রী',
-                      ),
-                      keyboardType: TextInputType.number,
+                    child: _customNumberField(
+                      label: 'স্বামী/স্ত্রী/সন্তান',
+                      value: spouseCount,
+                      maxValue: 3,
+                      onChanged: (value) {
+                        final newTotal = value + childCount;
+                        if (newTotal <= 3) {
+                          setState(() {
+                            spouseCount = value;
+                            spouseCountController.text = value.toString();
+                          });
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                              ),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 15),
                   Expanded(
-                    child: TextFormField(
-                      controller: childCountController,
-                      decoration: const InputDecoration(labelText: 'সন্তান'),
-                      keyboardType: TextInputType.number,
+                    child: _customNumberField(
+                      label: 'অন্যান্য আতিথী',
+                      value: childCount,
+                      maxValue: 3,
+                      onChanged: (value) {
+                        final newTotal = spouseCount + value;
+                        if (newTotal <= 3) {
+                          setState(() {
+                            childCount = value;
+                            childCountController.text = value.toString();
+                          });
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                              ),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFD4AF37).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: const Color(0xFFD4AF37),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'মোট অতিথি: ${spouseCount + childCount} জন (সর্বোচ্চ ৩ জন)',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF8B6914),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               if (isRunningStudent) ...[
                 TextFormField(
                   controller: finalClassController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'বর্তমান শ্রেণি',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
                   ),
+                  enabled: false,
+                  style: const TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: yearController,
-                  decoration: const InputDecoration(labelText: 'সাল'),
+                  decoration: InputDecoration(
+                    labelText: 'সাল',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                  enabled: false,
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ] else ...[
                 TextFormField(
                   controller: sscPassingYearController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'এসএসসি পাসের সাল',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
                   ),
+                  enabled: false,
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
               const SizedBox(height: 20),
@@ -384,5 +505,90 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         ),
       ),
     );
+  }
+
+  Widget _customNumberField({
+    required String label,
+    required int value,
+    required void Function(int) onChanged,
+    int? maxValue,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF8B6914),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            IconButton(
+              onPressed: value > 0 ? () => onChanged(value - 1) : null,
+              icon: const Icon(Icons.remove_circle_outline),
+              color: const Color(0xFFD4AF37),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFD4AF37)),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                value.toString(),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B6914),
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed:
+                  maxValue != null && value >= maxValue
+                      ? null
+                      : () => onChanged(value + 1),
+              icon: const Icon(Icons.add_circle_outline),
+              color:
+                  maxValue != null && value >= maxValue
+                      ? Colors.grey
+                      : const Color(0xFFD4AF37),
+            ),
+          ],
+        ),
+        if (maxValue != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'সর্বোচ্চ: $maxValue জন',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  int _calculateBaseFee() {
+    if (isRunningStudent) {
+      return 500; // Running students pay 500
+    } else {
+      // For old students, check if they passed between 2019-2026
+      final passingYear = sscPassingYearController.text.trim();
+      if (passingYear.isNotEmpty) {
+        final year = int.tryParse(passingYear);
+        if (year != null && year >= 2019 && year <= 2026) {
+          return 700; // Old students who passed 2019-2026 pay 700
+        }
+      }
+      return 1200; // Other old students pay 1200
+    }
   }
 }

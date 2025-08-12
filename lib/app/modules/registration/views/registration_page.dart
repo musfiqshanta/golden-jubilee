@@ -59,29 +59,29 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
                         //razuiqbal1996@gmail.com
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.auto_fix_high, size: 18),
-                            label: const Text(
-                              'ডেমো ডাটা পূরণ করুন',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueGrey.shade100,
-                              foregroundColor: Colors.black87,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ),
-                            onPressed: controller.fillDemoData,
-                          ),
-                        ),
+                        // MouseRegion(
+                        //   cursor: SystemMouseCursors.click,
+                        //   child: ElevatedButton.icon(
+                        //     icon: const Icon(Icons.auto_fix_high, size: 18),
+                        //     label: const Text(
+                        //       'ডেমো ডাটা পূরণ করুন',
+                        //       style: TextStyle(fontSize: 12),
+                        //     ),
+                        //     style: ElevatedButton.styleFrom(
+                        //       backgroundColor: Colors.blueGrey.shade100,
+                        //       foregroundColor: Colors.black87,
+                        //       padding: const EdgeInsets.symmetric(
+                        //         horizontal: 12,
+                        //         vertical: 8,
+                        //       ),
+                        //       shape: RoundedRectangleBorder(
+                        //         borderRadius: BorderRadius.circular(8),
+                        //       ),
+                        //       elevation: 0,
+                        //     ),
+                        //     onPressed: controller.fillDemoData,
+                        //   ),
+                        // ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -323,44 +323,61 @@ class RegistrationPage extends GetView<RegistrationController> {
                 const SizedBox(height: 20),
                 // Professional Information Section
                 _sectionCard('পেশাগত তথ্য', Icons.work, [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 15),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'পেশাগত তথ্য ঐচ্ছিক। আপনি যদি বর্তমানে কর্মরত না হন তবে এই তথ্যগুলি খালি রাখতে পারেন।',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   _textField(
                     controller: controller.occupationController,
-                    label: 'পেশা',
+                    label: 'পেশা (ঐচ্ছিক)',
                     icon: Icons.work_outline,
-                    hintText: 'বাংলায় আপনার পেশা লিখুন',
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'আপনার পেশা লিখুন'
-                                : null,
+                    hintText: 'বাংলায় আপনার পেশা লিখুন (ঐচ্ছিক)',
+                    validator: (value) => null, // Always optional
                   ),
                   const SizedBox(height: 15),
                   _textField(
                     controller: controller.designationController,
-                    label: 'পদবী',
+                    label: 'পদবী (ঐচ্ছিক)',
                     icon: Icons.badge_outlined,
-                    hintText: 'বাংলায় আপনার পদবী লিখুন',
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'আপনার পদবী লিখুন'
-                                : null,
+                    hintText: 'বাংলায় আপনার পদবী লিখুন (ঐচ্ছিক)',
+                    validator: (value) => null, // Always optional
                   ),
                   const SizedBox(height: 15),
                   _textField(
                     controller: controller.workplaceAddressController,
-                    label: 'কর্মস্থলের ঠিকানা',
+                    label: 'কর্মস্থলের ঠিকানা (ঐচ্ছিক)',
                     icon: Icons.business_outlined,
                     maxLines: 3,
-                    hintText: 'বাংলায় আপনার কর্মস্থলের ঠিকানা লিখুন',
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'আপনার কর্মস্থলের ঠিকানা লিখুন'
-                                : null,
+                    hintText: 'বাংলায় আপনার কর্মস্থলের ঠিকানা লিখুন (ঐচ্ছিক)',
+                    validator: (value) => null, // Always optional
                   ),
                 ]),
                 const SizedBox(height: 20),
+
                 // Personal Details Section
                 _sectionCard('ব্যক্তিগত বিবরণ', Icons.info, [
                   Obx(
@@ -390,19 +407,27 @@ class RegistrationPage extends GetView<RegistrationController> {
                 // Academic Information Section
                 _sectionCard('শিক্ষাগত তথ্য', Icons.school, [
                   Obx(
-                    () => Row(
+                    () => Column(
                       children: [
-                        Checkbox(
-                          value: controller.isRunningStudent.value,
-                          onChanged:
-                              (val) =>
-                                  controller.isRunningStudent.value =
-                                      val ?? false,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'বর্তমানে অধ্যয়নরত',
-                          style: TextStyle(fontSize: 16),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: controller.isRunningStudent.value,
+                              onChanged: (val) {
+                                controller.isRunningStudent.value =
+                                    val ?? false;
+                                // Reset still studying when running student is unchecked
+                                if (!(val ?? false)) {
+                                  controller.isStillStudying.value = false;
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'বর্তমানে অধ্যয়নরত (ছাত্র/ছাত্রী)',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -457,25 +482,92 @@ class RegistrationPage extends GetView<RegistrationController> {
                 // Family Participation Section
                 _sectionCard('পরিবার/অতিথী অংশগ্রহণ ', Icons.family_restroom, [
                   Obx(
-                    () => Row(
+                    () => Column(
                       children: [
-                        Expanded(
-                          child: _customNumberField(
-                            label: 'স্বামী/স্ত্রী/সন্তান',
-                            value: controller.spouseCount.value,
-
-                            onChanged:
-                                (value) => controller.spouseCount.value = value,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _customNumberField(
+                                label: 'স্বামী/স্ত্রী/সন্তান',
+                                value: controller.spouseCount.value,
+                                maxValue: 3,
+                                onChanged: (value) {
+                                  // Ensure total guests don't exceed 3
+                                  final currentChildCount =
+                                      controller.childCount.value;
+                                  final newTotal = value + currentChildCount;
+                                  if (newTotal <= 3) {
+                                    controller.spouseCount.value = value;
+                                  } else {
+                                    // Show warning if total would exceed 3
+                                    Get.snackbar(
+                                      'সতর্কতা',
+                                      'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                                      backgroundColor: Colors.orange,
+                                      colorText: Colors.white,
+                                      duration: const Duration(seconds: 2),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: _customNumberField(
+                                label: 'অন্যান্য আতিথী',
+                                value: controller.childCount.value,
+                                maxValue: 3,
+                                onChanged: (value) {
+                                  // Ensure total guests don't exceed 3
+                                  final currentSpouseCount =
+                                      controller.spouseCount.value;
+                                  final newTotal = currentSpouseCount + value;
+                                  if (newTotal <= 3) {
+                                    controller.childCount.value = value;
+                                  } else {
+                                    // Show warning if total would exceed 3
+                                    Get.snackbar(
+                                      'সতর্কতা',
+                                      'মোট অতিথির সংখ্যা ৩ জনের বেশি হতে পারবে না',
+                                      backgroundColor: Colors.orange,
+                                      colorText: Colors.white,
+                                      duration: const Duration(seconds: 2),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _customNumberField(
-                            label: 'অন্যান্য আতিথী',
-                            value: controller.childCount.value,
-
-                            onChanged:
-                                (value) => controller.childCount.value = value,
+                        const SizedBox(height: 15),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFD4AF37).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: const Color(0xFFD4AF37),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'মোট অতিথি: ${controller.spouseCount.value + controller.childCount.value} জন (সর্বোচ্চ ৩ জন)',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF8B6914),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -532,16 +624,21 @@ class RegistrationPage extends GetView<RegistrationController> {
                 // Total Amount Card
                 _sectionCard('মোট জমার পরিমাণ', Icons.attach_money, [
                   Obx(
-                    () => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        _buildTotalAmountText(controller),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF8B6914),
+                    () => Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            _buildTotalAmountText(controller),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8B6914),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -889,8 +986,8 @@ class RegistrationPage extends GetView<RegistrationController> {
   Widget _customNumberField({
     required String label,
     required int value,
-
     required void Function(int) onChanged,
+    int? maxValue,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -927,12 +1024,30 @@ class RegistrationPage extends GetView<RegistrationController> {
               ),
             ),
             IconButton(
-              onPressed: () => onChanged(value + 1),
+              onPressed:
+                  maxValue != null && value >= maxValue
+                      ? null
+                      : () => onChanged(value + 1),
               icon: const Icon(Icons.add_circle_outline),
-              color: const Color(0xFFD4AF37),
+              color:
+                  maxValue != null && value >= maxValue
+                      ? Colors.grey
+                      : const Color(0xFFD4AF37),
             ),
           ],
         ),
+        if (maxValue != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'সর্বোচ্চ: $maxValue জন',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
       ],
     );
   }

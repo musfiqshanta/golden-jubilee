@@ -45,6 +45,11 @@ class DonationService {
     return total;
   }
 
+  Future<int> getTotalDonationRequests() async {
+    final snapshot = await _firestore.collection('donations').get();
+    return snapshot.docs.length;
+  }
+
   Future<void> deleteDonation(String donationId) async {
     await _firestore.collection('donations').doc(donationId).delete();
   }

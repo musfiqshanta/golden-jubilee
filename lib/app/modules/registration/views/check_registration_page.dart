@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
+import 'package:suborno_joyonti/app/modules/registration/views/update_registration_page.dart';
+import 'package:suborno_joyonti/config/collection_names.dart';
 
 class CheckRegistrationPage extends StatefulWidget {
   const CheckRegistrationPage({super.key});
@@ -37,7 +39,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
       // Use collectionGroup to get all registrations and extract batch IDs
       final registrationsSnapshot =
           await FirebaseFirestore.instance
-              .collectionGroup('registrations')
+              .collectionGroup(CollectionConfig.registrationsCollection)
               .get();
 
       final Set<String> batchIds = {};
@@ -120,9 +122,9 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     try {
       final doc =
           await FirebaseFirestore.instance
-              .collection('batches')
+              .collection(CollectionConfig.batchesCollection)
               .doc(selectedBatch)
-              .collection('registrations')
+              .collection(CollectionConfig.registrationsCollection)
               .doc(phoneController.text.trim())
               .get();
 
@@ -479,39 +481,91 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                         ),
                                   ),
                                 ),
-                                // const SizedBox(width: 16),
-                                // MouseRegion(
-                                //   cursor: SystemMouseCursors.click,
-                                //   child: ElevatedButton.icon(
-                                //     icon: const Icon(Icons.edit),
-                                //     label: const Text(
-                                //       'তথ্য আপডেট করুন',
-                                //       style: TextStyle(
-                                //         fontWeight: FontWeight.bold,
-                                //       ),
-                                //     ),
-                                //     style: ElevatedButton.styleFrom(
-                                //       backgroundColor: Color(0xFFD4AF37),
-                                //       foregroundColor: Colors.white,
-                                //       padding: const EdgeInsets.symmetric(
-                                //         horizontal: 24,
-                                //         vertical: 14,
-                                //       ),
-                                //       shape: RoundedRectangleBorder(
-                                //         borderRadius: BorderRadius.circular(10),
-                                //       ),
-                                //     ),
-                                //     onPressed: () {
-                                //       Get.to(
-                                //         () => UpdateRegistrationPage(
-                                //           batchId: selectedBatch!,
-                                //           phone: phoneController.text.trim(),
-                                //           registrationData: foundRegistration!,
-                                //         ),
-                                //       );
-                                //     },
-                                //   ),
-                                // ),
+                                const SizedBox(width: 16),
+                                MouseRegion(
+                                  cursor:
+                                      (foundRegistration!['paymentStatus'] ==
+                                              'approved')
+                                          ? SystemMouseCursors.forbidden
+                                          : SystemMouseCursors.click,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.edit),
+                                    label: const Text(
+                                      'তথ্য আপডেট করুন',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          (foundRegistration!['paymentStatus'] ==
+                                                  'approved')
+                                              ? Colors.grey
+                                              : Color(0xFFD4AF37),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed:
+                                        (foundRegistration!['paymentStatus'] ==
+                                                'approved')
+                                            ? () {
+                                              Get.snackbar(
+                                                'সতর্কতা',
+                                                'পেমেন্ট সম্পন্ন হওয়ার পর তথ্য আপডেট করা যায় না',
+                                                backgroundColor: Colors.orange,
+                                                colorText: Colors.white,
+                                                duration: const Duration(
+                                                  seconds: 3,
+                                                ),
+                                              );
+                                            }
+                                            : () async {
+                                              print('Opening update page...');
+                                              final result = await Get.to(
+                                                () => UpdateRegistrationPage(
+                                                  batchId: selectedBatch!,
+                                                  phone:
+                                                      phoneController.text
+                                                          .trim(),
+                                                  registrationData:
+                                                      foundRegistration!,
+                                                ),
+                                              );
+
+                                              print(
+                                                'Update page returned with result: $result',
+                                              );
+
+                                              // If update was successful, refresh the data
+                                              if (result == true) {
+                                                print(
+                                                  'Update successful, refreshing data...',
+                                                );
+                                                // Clear current data first
+                                                setState(() {
+                                                  foundRegistration = null;
+                                                  hasSearched = false;
+                                                });
+                                                // Wait a moment then refresh
+                                                await Future.delayed(
+                                                  const Duration(
+                                                    milliseconds: 500,
+                                                  ),
+                                                );
+                                                await _checkRegistration();
+                                                print('Data refresh completed');
+                                              } else {
+                                                print('Update result: $result');
+                                              }
+                                            },
+                                  ),
+                                ),
                               ],
                             ),
                           ] else if (!isLoading) ...[
@@ -646,12 +700,59 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 24),
               const SizedBox(width: 10),
-              const Text(
-                'নিবন্ধন পাওয়া গেছে!',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
+              const Expanded(
+                child: Text(
+                  'নিবন্ধন পাওয়া গেছে!',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color:
+                      (registration['paymentStatus'] == 'approved')
+                          ? Colors.grey.withOpacity(0.1)
+                          : const Color(0xFFD4AF37).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color:
+                        (registration['paymentStatus'] == 'approved')
+                            ? Colors.grey
+                            : const Color(0xFFD4AF37),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      (registration['paymentStatus'] == 'approved')
+                          ? Icons.lock
+                          : Icons.edit,
+                      size: 16,
+                      color:
+                          (registration['paymentStatus'] == 'approved')
+                              ? Colors.grey
+                              : const Color(0xFFD4AF37),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      (registration['paymentStatus'] == 'approved')
+                          ? 'সম্পাদনা করা যায় না'
+                          : 'সম্পাদনা করা যায়',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color:
+                            (registration['paymentStatus'] == 'approved')
+                                ? Colors.grey
+                                : const Color(0xFFD4AF37),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

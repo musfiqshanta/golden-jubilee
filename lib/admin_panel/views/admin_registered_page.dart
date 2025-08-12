@@ -15,12 +15,20 @@ class AdminRegisteredPage extends StatelessWidget {
         ),
         backgroundColor: const Color(0xFF1976D2),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              // This will trigger rebuild and refresh the FutureBuilder
+              (context as Element).markNeedsBuild();
+            },
+            tooltip: 'Refresh Data',
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collectionGroup('registrations')
-                .snapshots(),
+      body: FutureBuilder<QuerySnapshot>(
+        future:
+            FirebaseFirestore.instance.collectionGroup('registrations').get(),
         builder: (context, regSnapshot) {
           if (regSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -215,14 +223,24 @@ class AdminBatchDetailsPage extends StatelessWidget {
         ),
         backgroundColor: const Color(0xFF1976D2),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              // This will trigger rebuild and refresh the FutureBuilder
+              (context as Element).markNeedsBuild();
+            },
+            tooltip: 'Refresh Data',
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream:
+      body: FutureBuilder<QuerySnapshot>(
+        future:
             FirebaseFirestore.instance
                 .collection('batches')
                 .doc(batchId)
                 .collection('registrations')
-                .snapshots(),
+                .get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -738,7 +756,7 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Base Fee: ৳${editedUser['isRunningStudent'] == true ? '700' : '1200'} (${editedUser['isRunningStudent'] == true ? 'Running' : 'Former'} Student)',
+                            'Base Fee: ৳${_calculateBaseFee(editedUser)} (${editedUser['isRunningStudent'] == true ? 'Running' : 'Former'} Student)',
                             style: const TextStyle(fontSize: 12),
                           ),
                           Text(
@@ -917,8 +935,7 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
     }
 
     // Fallback calculation for existing data
-    final bool isRunning = userData['isRunningStudent'] == true;
-    final int baseFee = isRunning ? 700 : 1200;
+    final int baseFee = _calculateBaseFee(userData);
     final int guestCount =
         (userData['spouseCount'] ?? 0) + (userData['childCount'] ?? 0);
     final int guestFee = guestCount * 500;
@@ -928,7 +945,7 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
   void _updateTotalPayable() {
     // Calculate total payable amount based on current editedUser data
     final bool isRunning = editedUser['isRunningStudent'] == true;
-    final int baseFee = isRunning ? 700 : 1200;
+    final int baseFee = _calculateBaseFee(editedUser);
     final int guestCount =
         (editedUser['spouseCount'] ?? 0) + (editedUser['childCount'] ?? 0);
     final int guestFee = guestCount * 500;
@@ -946,6 +963,24 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
     print('  guestCount: $guestCount');
     print('  guestFee: $guestFee');
     print('  totalPayable: $totalPayable');
+  }
+
+  int _calculateBaseFee(Map<String, dynamic> userData) {
+    final bool isRunning = userData['isRunningStudent'] == true;
+
+    if (isRunning) {
+      return 500; // Running students pay 500
+    } else {
+      // For old students, check if they passed between 2019-2026
+      final passingYear = userData['sscPassingYear'];
+      if (passingYear != null && passingYear != '') {
+        final year = int.tryParse(passingYear);
+        if (year != null && year >= 2019 && year <= 2026) {
+          return 700; // Old students who passed 2019-2026 pay 700
+        }
+      }
+      return 1200; // Other old students pay 1200
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'app/modules/registration/views/registration_page.dart';
 import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
+import 'config/collection_names.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app/modules/registration/views/registered_page.dart';
 import 'app/modules/registration/views/approved_users_page.dart';
@@ -27,10 +28,23 @@ import 'admin_panel/screens/edit_donation_screen.dart';
 import 'admin_panel/screens/search_user_screen.dart';
 import 'admin_panel/screens/countdown_settings_screen.dart';
 import 'services/countdown_service.dart';
+import 'admin_panel/services/counter_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set environment - change this to Environment.development for testing
+  CollectionConfig.setEnvironment(Environment.production);
+
+  // Initialize Firebase (same project, different collections)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Print environment info
+  if (CollectionConfig.isDevelopment) {
+    print('🔥 Running in DEVELOPMENT mode - using _dev collections');
+  } else {
+    print('🚀 Running in PRODUCTION mode - using live collections');
+  }
 
   // Configure GetX for clean URLs
   Get.config(defaultTransition: Transition.noTransition, enableLog: true);
@@ -44,7 +58,10 @@ class GoldenJubileeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Golden Jubilee Celebration',
+      title:
+          CollectionConfig.isDevelopment
+              ? 'Golden Jubilee (DEV)'
+              : 'Golden Jubilee Celebration',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFD4AF37), // Golden color
@@ -56,7 +73,7 @@ class GoldenJubileeApp extends StatelessWidget {
       ),
       initialBinding: RegistrationBinding(),
       home: const GoldenJubileeHomePage(),
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: CollectionConfig.isDevelopment,
       // Enable clean URLs without hash
       defaultTransition: Transition.noTransition,
       routingCallback: (routing) {
@@ -152,6 +169,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   Duration _registrationCountdown = Duration.zero;
   Duration _jubileeCountdown = Duration.zero;
 
+  // Statistics data - loaded once when page loads
+  int _totalRegistrations = 0;
+  double _totalCollections = 0.0;
+  int _totalApprovedUsers = 0;
+  bool _isLoadingStats = true;
+
   @override
   void initState() {
     super.initState();
@@ -194,6 +217,32 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
         _jubileeCountdown = duration;
       });
     });
+
+    // Load statistics once when page loads
+    _loadStatistics();
+  }
+
+  // Load statistics data once
+  Future<void> _loadStatistics() async {
+    try {
+      final futures = await Future.wait([
+        CounterService().getTotalRegistrationsCount(),
+        CounterService().getTotalCollectionsAmount(),
+        CounterService().getTotalApprovedUsersCount(),
+      ]);
+
+      setState(() {
+        _totalRegistrations = futures[0] as int;
+        _totalCollections = futures[1] as double;
+        _totalApprovedUsers = futures[2] as int;
+        _isLoadingStats = false;
+      });
+    } catch (e) {
+      print('Error loading statistics: $e');
+      setState(() {
+        _isLoadingStats = false;
+      });
+    }
   }
 
   @override
@@ -370,7 +419,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                               ),
                             ),
                             child: Text(
-                              'দান করুন',
+                              'আনুদান করুন',
                               style: TextStyle(
                                 fontSize: buttonFontSize,
                                 fontWeight: FontWeight.bold,
@@ -470,6 +519,8 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final isMobile = constraints.maxWidth < 500;
+                    final isBigScreen = constraints.maxWidth > 1200;
+
                     final children = [
                       // মোট নিবন্ধন
                       Tooltip(
@@ -483,12 +534,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 30,
-                                vertical: 15,
+                                horizontal: 20,
+                                vertical: 12,
                               ),
                               margin: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
+                                horizontal: 4,
+                                vertical: 4,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.2),
@@ -503,49 +554,41 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                   const Icon(
                                     Icons.people,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: 20,
                                   ),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 8),
                                   const Text(
                                     'মোট নিবন্ধন: ',
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   SizedBox(
-                                    width:
-                                        48, // enough for spinner or 4-digit number
-                                    child: StreamBuilder<QuerySnapshot>(
-                                      stream:
-                                          FirebaseFirestore.instance
-                                              .collectionGroup('registrations')
-                                              .snapshots(),
-                                      builder: (context, snapshot) {
-                                        if (!snapshot.hasData) {
-                                          return const Text(
-                                            '0',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
+                                    width: 40, // reduced from 48
+                                    child:
+                                        _isLoadingStats
+                                            ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.white),
+                                              ),
+                                            )
+                                            : Text(
+                                              '$_totalRegistrations',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
-                                            textAlign: TextAlign.center,
-                                          );
-                                        }
-                                        final total = snapshot.data!.size;
-                                        return Text(
-                                          '$total',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        );
-                                      },
-                                    ),
                                   ),
                                 ],
                               ),
@@ -565,12 +608,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 30,
-                                vertical: 15,
+                                horizontal: 20,
+                                vertical: 12,
                               ),
                               margin: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
+                                horizontal: 4,
+                                vertical: 4,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.2),
@@ -588,108 +631,88 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                       const Icon(
                                         Icons.attach_money,
                                         color: Colors.white,
-                                        size: 24,
+                                        size: 20,
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 8),
                                       const Text(
                                         'মোট সংগ্রহ: ',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 16,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                       SizedBox(
-                                        width: 70,
-                                        child: StreamBuilder<QuerySnapshot>(
-                                          stream:
-                                              FirebaseFirestore.instance
-                                                  .collectionGroup(
-                                                    'registrations',
-                                                  )
-                                                  .where(
-                                                    'paymentStatus',
-                                                    isEqualTo: 'approved',
-                                                  )
-                                                  .snapshots(),
-                                          builder: (context, snapshot) {
-                                            double totalCollection = 0;
-                                            int approvedCount = 0;
-                                            if (snapshot.hasData) {
-                                              approvedCount =
-                                                  snapshot.data!.docs.length;
-                                              for (var doc
-                                                  in snapshot.data!.docs) {
-                                                final data =
-                                                    doc.data()
-                                                        as Map<String, dynamic>;
-                                                totalCollection +=
-                                                    (data['totalPayable'] ?? 0)
-                                                        as num;
-                                              }
-                                            }
-                                            return Text(
-                                              '৳$totalCollection',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            );
-                                          },
-                                        ),
+                                        width: 60, // reduced from 70
+                                        child:
+                                            _isLoadingStats
+                                                ? const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                )
+                                                : Text(
+                                                  '৳$_totalCollections',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 5),
+                                  const SizedBox(height: 4), // reduced from 5
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(
                                         Icons.check_circle,
                                         color: Colors.white,
-                                        size: 16,
+                                        size: 14, // reduced from 16
                                       ),
-                                      const SizedBox(width: 5),
+                                      const SizedBox(
+                                        width: 4,
+                                      ), // reduced from 5
                                       const Text(
                                         'অনুমোদিত: ',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 12,
+                                          fontSize: 11, // reduced from 12
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                       SizedBox(
-                                        width: 30,
-                                        child: StreamBuilder<QuerySnapshot>(
-                                          stream:
-                                              FirebaseFirestore.instance
-                                                  .collectionGroup(
-                                                    'registrations',
-                                                  )
-                                                  .where(
-                                                    'paymentStatus',
-                                                    isEqualTo: 'approved',
-                                                  )
-                                                  .snapshots(),
-                                          builder: (context, snapshot) {
-                                            int approvedCount = 0;
-                                            if (snapshot.hasData) {
-                                              approvedCount =
-                                                  snapshot.data!.docs.length;
-                                            }
-                                            return Text(
-                                              '$approvedCount',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            );
-                                          },
-                                        ),
+                                        width: 25, // reduced from 30
+                                        child:
+                                            _isLoadingStats
+                                                ? const SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                )
+                                                : Text(
+                                                  '$_totalApprovedUsers',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
                                       ),
                                     ],
                                   ),
@@ -702,12 +725,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                       // মোট অনুদান
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 15,
+                          horizontal: 20,
+                          vertical: 12,
                         ),
                         margin: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 6,
+                          horizontal: 4,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
@@ -722,24 +745,25 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                             const Icon(
                               Icons.volunteer_activism,
                               color: Colors.white,
-                              size: 24,
+                              size: 20,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             const Text(
                               'মোট অনুদান: ',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(
-                              width: 70,
-                              child: StreamBuilder<QuerySnapshot>(
-                                stream:
+                              width: 60, // reduced from 70
+                              child: FutureBuilder<QuerySnapshot>(
+                                future:
                                     FirebaseFirestore.instance
                                         .collection('donations')
-                                        .snapshots(),
+                                        .where('status', isEqualTo: 'approved')
+                                        .get(),
                                 builder: (context, snapshot) {
                                   double totalDonation = 0;
                                   if (snapshot.hasData) {
@@ -754,7 +778,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                     '৳$totalDonation',
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     textAlign: TextAlign.center,
@@ -766,12 +790,15 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                         ),
                       ),
                     ];
+
                     if (isMobile) {
+                      // Mobile: Stack vertically
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: children,
                       );
                     } else {
+                      // Medium and Big screens: All 3 in same row
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: children,
@@ -1020,25 +1047,25 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 'উদ্বোধনী অনুষ্ঠান',
                 '৫০ বছর পূর্তি উদযাপনের জাঁকজমকপূর্ণ উদ্বোধন',
                 Icons.event,
-                ' ফেব্রুয়ারি , ২০২৫',
+                ' ফেব্রুয়ারি , ২০২৬',
               ),
               _buildEventCard(
                 'গালা লাঞ্চ',
                 ' লাঞ্চ, সুস্বাদু খাবার ও বিনোদন',
                 Icons.restaurant,
-                'ফেব্রুয়ারি , ২০২৫',
+                'ফেব্রুয়ারি , ২০২৬',
               ),
               _buildEventCard(
                 'সাংস্কৃতিক অনুষ্ঠান',
                 'আমাদের সমৃদ্ধ ঐতিহ্য ও সাংস্কৃতিক বৈচিত্র্য উপস্থাপন',
                 Icons.music_note,
-                'ফেব্রুয়ারি, ২০২৫',
+                'ফেব্রুয়ারি, ২০২৬',
               ),
               _buildEventCard(
                 'সমাপনী অনুষ্ঠান',
                 'সুবর্ণজয়ন্তী উদযাপনের স্মরণীয় সমাপ্তি',
                 Icons.celebration,
-                'ফেব্রুয়ারি, ২০২৫',
+                'ফেব্রুয়ারি, ২০২৬',
               ),
             ],
           ),

@@ -3,13 +3,67 @@ import '../widgets/admin_drawer.dart';
 import '../services/user_service.dart';
 import '../services/payment_service.dart';
 import '../services/donation_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/counter_service.dart';
+import '../utils/initialize_counters.dart';
 import '../views/admin_registered_page.dart';
 import '../views/admin_approved_users_page.dart';
 import 'donations_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  // Cache for dashboard data to prevent unnecessary refetches
+  Map<String, dynamic> _cachedData = {};
+  bool _isLoading = false;
+
+  // Initialize data once when widget is created
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  // Load dashboard data
+  Future<void> _loadDashboardData() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Use optimized method to get all statistics in one query
+      final stats = await CounterService().getAllStatistics();
+
+      // Load donation data separately (since it's from different collection)
+      final donationFutures = await Future.wait([
+        DonationService().getTotalDonationRequests(),
+        DonationService().getTotalApprovedDonations(),
+      ]);
+
+      setState(() {
+        _cachedData = {
+          'totalRegistrations': stats['totalRegistrations'],
+          'totalGuests': stats['totalGuests'],
+          'totalDonationRequests': donationFutures[0],
+          'totalApprovedDonations': donationFutures[1],
+          'totalCollections': stats['totalCollections'],
+          'totalApprovedUsers': stats['totalApprovedUsers'],
+        };
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading dashboard data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +75,136 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Add counter management buttons at the top
+            Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Show all main buttons in same row on big screens
+                  bool isBigScreen = constraints.maxWidth > 1200;
+
+                  return Column(
+                    children: [
+                      // Main action buttons - always in same row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                await CounterInitializer.initializeCounters();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Counters initialized successfully!',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Error initializing counters: $e',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.add_circle),
+                            label: const Text('Initialize Counters'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Counter Status Indicator
+            FutureBuilder<bool>(
+              future: CounterService().areCountersInitialized(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final countersInitialized = snapshot.data ?? false;
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color:
+                        countersInitialized
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color:
+                          countersInitialized
+                              ? Colors.green.shade200
+                              : Colors.orange.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        countersInitialized
+                            ? Icons.check_circle
+                            : Icons.warning,
+                        color:
+                            countersInitialized ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          countersInitialized
+                              ? '✅ Counters are initialized and working efficiently'
+                              : '⚠️ Counters not initialized - using fallback data (higher read costs)',
+                          style: TextStyle(
+                            color:
+                                countersInitialized
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
             LayoutBuilder(
               builder: (context, constraints) {
                 int crossAxisCount = 2;
                 if (constraints.maxWidth > 900) {
                   crossAxisCount = 4;
                 }
+
+                if (_isLoading) {
+                  return const Center(
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Loading dashboard data...'),
+                      ],
+                    ),
+                  );
+                }
+
                 return GridView.count(
                   crossAxisCount: crossAxisCount,
                   shrinkWrap: true,
@@ -75,7 +253,10 @@ class DashboardScreen extends StatelessWidget {
                         const SizedBox(width: 16),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => Navigator.of(context).pushNamed('/admin/countdown-settings'),
+                            onPressed:
+                                () => Navigator.of(
+                                  context,
+                                ).pushNamed('/admin/countdown-settings'),
                             icon: const Icon(Icons.timer),
                             label: const Text('Countdown Settings'),
                             style: ElevatedButton.styleFrom(
@@ -162,46 +343,18 @@ class DashboardScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const AdminRegisteredPage()),
           );
         },
-        child: StreamBuilder<QuerySnapshot>(
-          stream:
-              FirebaseFirestore.instance
-                  .collectionGroup('registrations')
-                  .snapshots(),
-          builder: (context, snapshot) {
-            int totalRegister = 0;
-            if (snapshot.hasData) {
-              totalRegister = snapshot.data!.docs.length;
-            }
-            return _statCard(
-              'Total Register',
-              totalRegister.toString(),
-              Icons.app_registration,
-              isClickable: true,
-            );
-          },
+        child: _statCard(
+          'Total Register',
+          (_cachedData['totalRegistrations'] ?? 0).toString(),
+          Icons.app_registration,
+          isClickable: true,
         ),
       ),
       // Total Guest
-      StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collectionGroup('registrations')
-                .snapshots(),
-        builder: (context, snapshot) {
-          double totalGuest = 0;
-          if (snapshot.hasData) {
-            for (var doc in snapshot.data!.docs) {
-              final data = doc.data() as Map<String, dynamic>;
-              totalGuest +=
-                  (data['spouseCount'] ?? 0) + (data['childCount'] ?? 0);
-            }
-          }
-          return _statCard(
-            'Total Guest',
-            totalGuest.toInt().toString(),
-            Icons.group_add,
-          );
-        },
+      _statCard(
+        'Total Guest',
+        (_cachedData['totalGuests'] ?? 0).toString(),
+        Icons.group_add,
       ),
       // Total Donation Requests (clickable)
       GestureDetector(
@@ -213,21 +366,11 @@ class DashboardScreen extends StatelessWidget {
             ),
           );
         },
-        child: StreamBuilder<QuerySnapshot>(
-          stream:
-              FirebaseFirestore.instance.collection('donations').snapshots(),
-          builder: (context, snapshot) {
-            int totalRequests = 0;
-            if (snapshot.hasData) {
-              totalRequests = snapshot.data!.docs.length;
-            }
-            return _statCard(
-              'Total Donation Requests',
-              totalRequests.toString(),
-              Icons.request_page,
-              isClickable: true,
-            );
-          },
+        child: _statCard(
+          'Total Donation Requests',
+          (_cachedData['totalDonationRequests'] ?? 0).toString(),
+          Icons.request_page,
+          isClickable: true,
         ),
       ),
       // Approved Donations Amount (clickable)
@@ -240,51 +383,18 @@ class DashboardScreen extends StatelessWidget {
             ),
           );
         },
-        child: StreamBuilder<QuerySnapshot>(
-          stream:
-              FirebaseFirestore.instance
-                  .collection('donations')
-                  .where('status', isEqualTo: 'approved')
-                  .snapshots(),
-          builder: (context, snapshot) {
-            double totalDonation = 0;
-            if (snapshot.hasData) {
-              for (var doc in snapshot.data!.docs) {
-                final data = doc.data() as Map<String, dynamic>;
-                totalDonation += (data['amount'] ?? 0) as num;
-              }
-            }
-            return _statCard(
-              'Approved Donations',
-              '৳$totalDonation',
-              Icons.volunteer_activism,
-              isClickable: true,
-            );
-          },
+        child: _statCard(
+          'Approved Donations',
+          '৳${_cachedData['totalApprovedDonations'] ?? 0}',
+          Icons.volunteer_activism,
+          isClickable: true,
         ),
       ),
       // Collections
-      StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collectionGroup('registrations')
-                .where('paymentStatus', isEqualTo: 'approved')
-                .snapshots(),
-        builder: (context, snapshot) {
-          double totalCollection = 0;
-          if (snapshot.hasData) {
-            for (var doc in snapshot.data!.docs) {
-              final data = doc.data() as Map<String, dynamic>;
-              // Use stored totalPayable amount
-              totalCollection += (data['totalPayable'] ?? 0) as num;
-            }
-          }
-          return _statCard(
-            'Collections',
-            '৳$totalCollection',
-            Icons.account_balance_wallet,
-          );
-        },
+      _statCard(
+        'Collections',
+        '৳${_cachedData['totalCollections'] ?? 0}',
+        Icons.account_balance_wallet,
       ),
       // Approved Users Card
       GestureDetector(
@@ -293,24 +403,11 @@ class DashboardScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const AdminApprovedUsersPage()),
           );
         },
-        child: StreamBuilder<QuerySnapshot>(
-          stream:
-              FirebaseFirestore.instance
-                  .collectionGroup('registrations')
-                  .where('paymentStatus', isEqualTo: 'approved')
-                  .snapshots(),
-          builder: (context, snapshot) {
-            int approvedCount = 0;
-            if (snapshot.hasData) {
-              approvedCount = snapshot.data!.docs.length;
-            }
-            return _statCard(
-              'Approved',
-              approvedCount.toString(),
-              Icons.verified_user,
-              isClickable: true,
-            );
-          },
+        child: _statCard(
+          'Approved',
+          (_cachedData['totalApprovedUsers'] ?? 0).toString(),
+          Icons.verified_user,
+          isClickable: true,
         ),
       ),
     ];
@@ -346,30 +443,31 @@ class DashboardScreen extends StatelessWidget {
                 color: isClickable ? const Color(0xFF1976D2) : null,
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight:
-                          isClickable ? FontWeight.bold : FontWeight.normal,
-                      color: isClickable ? const Color(0xFF1976D2) : null,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            isClickable ? FontWeight.bold : FontWeight.normal,
+                        color: isClickable ? const Color(0xFF1976D2) : null,
+                      ),
                     ),
-                  ),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: isClickable ? const Color(0xFF1976D2) : null,
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isClickable ? const Color(0xFF1976D2) : null,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (isClickable) ...[
-                const Spacer(),
                 const Icon(
                   Icons.arrow_forward_ios,
                   color: Color(0xFF1976D2),

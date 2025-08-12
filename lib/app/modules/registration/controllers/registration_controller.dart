@@ -17,6 +17,8 @@ import 'package:pdf/pdf.dart';
 import 'package:suborno_joyonti/app/services/pdf_service_web.dart'
     if (dart.library.io) 'package:suborno_joyonti/app/services/pdf_service_mobile.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
+import 'package:suborno_joyonti/config/collection_names.dart';
+import 'package:suborno_joyonti/admin_panel/services/counter_service.dart';
 
 class RegistrationController extends GetxController {
   // Form controllers
@@ -47,6 +49,7 @@ class RegistrationController extends GetxController {
   var selectedPhoto = Rxn<PlatformFile>();
   var photoError = RxnString();
   var isRunningStudent = false.obs;
+  var isStillStudying = false.obs;
   var selectedTshirtSize = RxnString();
   var selectedBloodGroup = ''.obs;
 
@@ -414,6 +417,32 @@ class RegistrationController extends GetxController {
     }
 
     final isRunning = isRunningStudent.value;
+
+    // Validate that a valid batch/year is selected
+    if (!isRunning &&
+        (selectedSscPassingYear.value.isEmpty ||
+            selectedSscPassingYear.value == 'None')) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুগ্রহ করে একটি বৈধ এসএসসি পাশের বছর নির্বাচন করুন',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (isRunning &&
+        (selectedFinalClass.value.isEmpty ||
+            selectedFinalClass.value == 'None')) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুগ্রহ করে একটি বৈধ শ্রেণি নির্বাচন করুন',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
     final batch =
         isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
     final phone = mobileController.text.trim();
@@ -422,9 +451,9 @@ class RegistrationController extends GetxController {
     try {
       final existingDoc =
           await FirebaseFirestore.instance
-              .collection('batches')
+              .collection(CollectionConfig.batchesCollection)
               .doc(batch)
-              .collection('registrations')
+              .collection(CollectionConfig.registrationsCollection)
               .doc(phone)
               .get();
 
@@ -546,18 +575,32 @@ class RegistrationController extends GetxController {
     data['formSerialNumber'] = formSerialNumber;
     try {
       await FirebaseFirestore.instance
-          .collection('batches')
+          .collection(CollectionConfig.batchesCollection)
           .doc(batch)
-          .collection('registrations')
+          .collection(CollectionConfig.registrationsCollection)
           .doc(phone)
           .set(data);
+
+      // Update counters to reduce future read operations
+      try {
+        final counterService = CounterService();
+        await counterService.incrementTotalRegistrations();
+
+        final int guestCount = spouseCount.value + childCount.value;
+        if (guestCount > 0) {
+          await counterService.updateTotalGuests(guestCount);
+        }
+      } catch (e) {
+        print('Warning: Failed to update counters: $e');
+        // Don't fail the registration if counter update fails
+      }
 
       // Fetch the saved registration document to get the correct formSerialNumber
       final doc =
           await FirebaseFirestore.instance
-              .collection('batches')
+              .collection(CollectionConfig.batchesCollection)
               .doc(batch)
-              .collection('registrations')
+              .collection(CollectionConfig.registrationsCollection)
               .doc(phone)
               .get();
 
@@ -637,6 +680,7 @@ class RegistrationController extends GetxController {
       'year': selectedYear.value,
       'sscPassingYear': selectedSscPassingYear.value,
       'isRunningStudent': isRunningStudent.value,
+      'isStillStudying': isStillStudying.value,
       'spouseCount': spouseCount.value,
       'childCount': childCount.value,
       'parentCount': parentCount.value,

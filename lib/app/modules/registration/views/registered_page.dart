@@ -2,8 +2,121 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RegisteredPage extends StatelessWidget {
+class RegisteredPage extends StatefulWidget {
   const RegisteredPage({super.key});
+
+  @override
+  State<RegisteredPage> createState() => _RegisteredPageState();
+}
+
+class _RegisteredPageState extends State<RegisteredPage> {
+  // Cache for batch data to prevent unnecessary refetches
+  Map<String, dynamic>? _cachedBatchData;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBatchData();
+  }
+
+  // Load batch data once when page loads
+  Future<void> _loadBatchData() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Get all registrations once
+      final registrationsSnapshot =
+          await FirebaseFirestore.instance
+              .collectionGroup('registrations')
+              .get();
+
+      // Group registrations by batchId (parent.id)
+      final Map<String, List<QueryDocumentSnapshot>> batchMap = {};
+      for (var doc in registrationsSnapshot.docs) {
+        final batchId = doc.reference.parent.parent?.id ?? 'Unknown';
+        batchMap.putIfAbsent(batchId, () => []).add(doc);
+      }
+
+      // Process batch data
+      final batchIds = batchMap.keys.toList();
+      final runningClassBatches =
+          batchIds.where((id) => id.endsWith('শ্রেণি')).toList();
+      final yearBatches =
+          batchIds.where((id) => int.tryParse(id) != null).toList();
+      yearBatches.sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+      final otherBatches =
+          batchIds
+              .where((id) => !id.endsWith('শ্রেণি') && int.tryParse(id) == null)
+              .toList();
+
+      // Compose final batch list
+      final filteredOtherBatches =
+          otherBatches.where((id) => id != 'running').toList();
+      final displayBatchIds = [
+        '__running_batch__',
+        ...yearBatches,
+        ...filteredOtherBatches,
+      ];
+
+      // Calculate statistics for each batch
+      final Map<String, Map<String, int>> batchStats = {};
+      for (var batchId in batchIds) {
+        final registrations = batchMap[batchId] ?? [];
+        int totalCount = registrations.length;
+        int approvedCount = 0;
+
+        for (var doc in registrations) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data['paymentStatus'] == 'approved') {
+            approvedCount++;
+          }
+        }
+
+        batchStats[batchId] = {'total': totalCount, 'approved': approvedCount};
+      }
+
+      // Calculate running batch totals
+      int totalRunning = 0;
+      int totalRunningApproved = 0;
+      for (var classId in runningClassBatches) {
+        final stats = batchStats[classId];
+        if (stats != null) {
+          totalRunning += stats['total']!;
+          totalRunningApproved += stats['approved']!;
+        }
+      }
+
+      setState(() {
+        _cachedBatchData = {
+          'batchMap': batchMap,
+          'batchIds': batchIds,
+          'runningClassBatches': runningClassBatches,
+          'yearBatches': yearBatches,
+          'otherBatches': otherBatches,
+          'displayBatchIds': displayBatchIds,
+          'batchStats': batchStats,
+          'totalRunning': totalRunning,
+          'totalRunningApproved': totalRunningApproved,
+        };
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading batch data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Refresh batch data manually
+  Future<void> _refreshBatchData() async {
+    await _loadBatchData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,356 +130,316 @@ class RegisteredPage extends StatelessWidget {
           ),
           backgroundColor: const Color(0xFFD4AF37),
           iconTheme: const IconThemeData(color: Colors.white),
+          actions: [
+            IconButton(
+              onPressed: _refreshBatchData,
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Refresh Data',
+            ),
+          ],
         ),
-        body: StreamBuilder<QuerySnapshot>(
-          stream:
-              FirebaseFirestore.instance
-                  .collectionGroup('registrations')
-                  .snapshots(),
-          builder: (context, regSnapshot) {
-            if (regSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!regSnapshot.hasData || regSnapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('No registrations found.'));
-            }
-            // Group registrations by batchId (parent.id)
-            final Map<String, List<QueryDocumentSnapshot>> batchMap = {};
-            for (var doc in regSnapshot.data!.docs) {
-              final batchId = doc.reference.parent.parent?.id ?? 'Unknown';
-              batchMap.putIfAbsent(batchId, () => []).add(doc);
-            }
-            final batchIds = batchMap.keys.toList();
-
-            // Separate running class batches (Bangla names ending with 'শ্রেণি') and year batches (numeric)
-            final runningClassBatches =
-                batchIds.where((id) => id.endsWith('শ্রেণি')).toList();
-            final yearBatches =
-                batchIds.where((id) => int.tryParse(id) != null).toList();
-            yearBatches.sort((a, b) => int.parse(a).compareTo(int.parse(b)));
-            final otherBatches =
-                batchIds
-                    .where(
-                      (id) =>
-                          !id.endsWith('শ্রেণি') && int.tryParse(id) == null,
-                    )
-                    .toList();
-
-            // Compose final batch list: Running Batch (virtual), then years, then others
-            // Remove 'running' from otherBatches if present
-            final filteredOtherBatches =
-                otherBatches.where((id) => id != 'running').toList();
-            final displayBatchIds = [
-              '__running_batch__',
-              ...yearBatches,
-              ...filteredOtherBatches,
-            ];
-
-            return Padding(
-              padding: const EdgeInsets.all(12),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  int crossAxisCount = 2;
-                  if (width > 1200) {
-                    crossAxisCount = 6;
-                  } else if (width > 900) {
-                    crossAxisCount = 4;
-                  } else if (width > 600) {
-                    crossAxisCount = 3;
-                  }
-                  return GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 2,
-                    ),
-                    itemCount: displayBatchIds.length,
-                    itemBuilder: (context, index) {
-                      final batchId = displayBatchIds[index];
-                      if (batchId == '__running_batch__') {
-                        // Virtual card for Running Batch
-                        int totalRunning = 0;
-                        int totalApproved = 0;
-                        for (var classId in runningClassBatches) {
-                          final classRegistrations = batchMap[classId] ?? [];
-                          totalRunning += classRegistrations.length;
-                          for (var doc in classRegistrations) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            if (data['paymentStatus'] == 'approved') {
-                              totalApproved++;
-                            }
-                          }
-                        }
-                        return MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () {
-                              Get.to(
-                                () => RunningBatchPage(
-                                  runningClassBatches: runningClassBatches,
-                                  batchMap: batchMap,
-                                ),
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF145A32), // Deep Green
-                                    Color(0xFFFFD700), // Golden
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    'বর্তমানে অধ্যয়নরত',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      letterSpacing: 1.2,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black26,
-                                          blurRadius: 4,
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Total registrations
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.18),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.people,
-                                          color: Colors.white,
-                                          size: 13,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '$totalRunning',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black26,
-                                                blurRadius: 2,
-                                                offset: Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // Approved count
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.white,
-                                          size: 13,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '$totalApproved',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black26,
-                                                blurRadius: 2,
-                                                offset: Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      // Normal batch card
-                      final regCount = batchMap[batchId]?.length ?? 0;
-                      // Calculate approved count for this batch
-                      int approvedCount = 0;
-                      if (batchMap[batchId] != null) {
-                        for (var doc in batchMap[batchId]!) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          if (data['paymentStatus'] == 'approved') {
-                            approvedCount++;
-                          }
-                        }
-                      }
-                      return MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () {
-                            Get.to(() => BatchDetailsPage(batchId: batchId));
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.10),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const SizedBox(height: 6),
-                                Text(
-                                  'ব্যাচ $batchId',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 1.1,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                // Total registrations
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.18),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.people,
-                                        color: Colors.white,
-                                        size: 11,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '$regCount',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                // Approved count
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white,
-                                        size: 11,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '$approvedCount',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            );
-          },
-        ),
+        body:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _cachedBatchData == null
+                ? const Center(child: Text('No data available'))
+                : _buildBatchGrid(),
       );
     } catch (e, st) {
       print('Error building RegisteredPage: $e\n$st');
       return const Center(child: Text('Error loading page'));
     }
+  }
+
+  Widget _buildBatchGrid() {
+    final data = _cachedBatchData!;
+    final displayBatchIds = data['displayBatchIds'] as List<String>;
+    final batchStats = data['batchStats'] as Map<String, Map<String, int>>;
+    final runningClassBatches = data['runningClassBatches'] as List<String>;
+    final totalRunning = data['totalRunning'] as int;
+    final totalRunningApproved = data['totalRunningApproved'] as int;
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          int crossAxisCount = 2;
+          if (width > 1200) {
+            crossAxisCount = 6;
+          } else if (width > 900) {
+            crossAxisCount = 4;
+          } else if (width > 600) {
+            crossAxisCount = 3;
+          }
+          return GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2,
+            ),
+            itemCount: displayBatchIds.length,
+            itemBuilder: (context, index) {
+              final batchId = displayBatchIds[index];
+              if (batchId == '__running_batch__') {
+                // Virtual card for Running Batch
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      Get.to(
+                        () => RunningBatchPage(
+                          runningClassBatches: runningClassBatches,
+                          batchMap:
+                              data['batchMap']
+                                  as Map<String, List<QueryDocumentSnapshot>>,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF145A32), // Deep Green
+                            Color(0xFFFFD700), // Golden
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 6),
+                          const Text(
+                            'বর্তমানে অধ্যয়নরত',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Total registrations
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.people,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '$totalRunning',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 2,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Approved count
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '$totalRunningApproved',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 2,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              // Normal batch card
+              final stats = batchStats[batchId];
+              final regCount = stats?['total'] ?? 0;
+              final approvedCount = stats?['approved'] ?? 0;
+
+              return MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () {
+                    Get.to(() => BatchDetailsPage(batchId: batchId));
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 6),
+                        Text(
+                          'ব্যাচ $batchId',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Total registrations
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.people,
+                                color: Colors.white,
+                                size: 11,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '$regCount',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Approved count
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                                size: 11,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '$approvedCount',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
 
