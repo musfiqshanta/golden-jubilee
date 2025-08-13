@@ -56,7 +56,29 @@ class PdfService {
                   DateTime.now()
               : DateTime.now();
       final isRunningStudent = data['isRunningStudent'] == true;
-      final totalGuest = (data['spouseCount'] ?? 0) + (data['childCount'] ?? 0);
+
+      // Safe guest count calculation with validation
+      final spouseCount = data['spouseCount'] ?? 0;
+      final childCount = data['childCount'] ?? 0;
+      final totalGuest = spouseCount + childCount;
+
+      // Safe guest data extraction with validation
+      final guestNames =
+          data['guestNames'] is List
+              ? (data['guestNames'] as List).cast<String>()
+              : <String>[];
+      final guestRelationships =
+          data['guestRelationships'] is List
+              ? (data['guestRelationships'] as List).cast<String>()
+              : <String>[];
+
+      // Validate guest data consistency
+      final hasValidGuestData =
+          totalGuest > 0 &&
+          guestNames.isNotEmpty &&
+          guestRelationships.isNotEmpty &&
+          guestNames.length == totalGuest &&
+          guestRelationships.length == totalGuest;
 
       // Use the totalPayable from database instead of hardcoded calculation
       final totalAmount = data['totalPayable'] ?? 0;
@@ -411,10 +433,9 @@ class PdfService {
                       ],
                     ),
 
-                    // Full-width guest information row
-                    if (data['guestNames'] != null &&
-                        data['guestNames'] is List &&
-                        (data['guestNames'] as List).isNotEmpty) ...[
+                    // Guest information section - handle both cases
+                    if (hasValidGuestData) ...[
+                      // Show guest details when guests exist and data is valid
                       pw.Container(
                         width: double.infinity,
                         padding: pw.EdgeInsets.all(12),
@@ -439,38 +460,94 @@ class PdfService {
                               ),
                             ),
                             pw.SizedBox(width: 8),
-                            ...List.generate(
-                              (data['guestNames'] as List).length,
-                              (index) {
-                                final guestName =
-                                    (data['guestNames'] as List)[index] ?? '';
-                                final guestRelationship =
-                                    (data['guestRelationships']
-                                        as List)[index] ??
-                                    '';
-                                if (guestName.isNotEmpty) {
-                                  return pw.Padding(
-                                    padding: pw.EdgeInsets.only(right: 16),
-                                    child: pw.Text(
-                                      '${index + 1}. ${guestName} (${guestRelationship})'
-                                          .fix(),
-                                      style: pw.TextStyle(
-                                        font: useFont,
-                                        fontSize: 10,
-                                        color: PdfColors.black,
-                                      ),
+                            ...List.generate(guestNames.length, (index) {
+                              final guestName = guestNames[index];
+                              final guestRelationship =
+                                  index < guestRelationships.length
+                                      ? guestRelationships[index]
+                                      : '';
+                              if (guestName.isNotEmpty) {
+                                return pw.Padding(
+                                  padding: pw.EdgeInsets.only(right: 16),
+                                  child: pw.Text(
+                                    '${index + 1}. $guestName ($guestRelationship)'
+                                        .fix(),
+                                    style: pw.TextStyle(
+                                      font: useFont,
+                                      fontSize: 10,
+                                      color: PdfColors.black,
                                     ),
-                                  );
-                                }
-                                return pw.SizedBox.shrink();
-                              },
+                                  ),
+                                );
+                              }
+                              return pw.SizedBox.shrink();
+                            }),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(height: 30),
+                    ] else if (totalGuest == 0) ...[
+                      // Show "No Guests" message when there are no guests
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.grey50,
+                          border: pw.Border.all(
+                            color: PdfColors.grey300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Text(
+                          'কোনো অতিথি নেই'.fix(),
+                          style: pw.TextStyle(
+                            font: useFont2,
+                            fontSize: 12,
+                            color: PdfColors.grey600,
+                            fontStyle: pw.FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 30),
+                    ] else ...[
+                      // Show warning when guest count doesn't match data
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.orange50,
+                          border: pw.Border.all(
+                            color: PdfColors.orange300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            pw.Icon(
+                              pw.IconData(0xe001), // warning icon
+                              color: PdfColors.orange600,
+                              size: 16,
+                            ),
+                            pw.SizedBox(width: 8),
+                            pw.Text(
+                              'অতিথির তথ্য অসম্পূর্ণ (${totalGuest} অতিথি, ${guestNames.length} নাম)'
+                                  .fix(),
+                              style: pw.TextStyle(
+                                font: useFont2,
+                                fontSize: 12,
+                                color: PdfColors.orange600,
+                                fontStyle: pw.FontStyle.italic,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      pw.SizedBox(height: 20),
+                      pw.SizedBox(height: 30),
                     ],
-                    pw.SizedBox(height: 10),
+
+                    // Consistent spacing after guest section
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
@@ -638,10 +715,9 @@ class PdfService {
                         ],
                       ),
                     ),
-                    // Full-width guest information row
-                    if (data['guestNames'] != null &&
-                        data['guestNames'] is List &&
-                        (data['guestNames'] as List).isNotEmpty) ...[
+                    // Guest information section - handle both cases
+                    if (hasValidGuestData) ...[
+                      // Show guest details when guests exist and data is valid
                       pw.Container(
                         width: double.infinity,
                         padding: pw.EdgeInsets.all(12),
@@ -666,38 +742,94 @@ class PdfService {
                               ),
                             ),
                             pw.SizedBox(width: 8),
-                            ...List.generate(
-                              (data['guestNames'] as List).length,
-                              (index) {
-                                final guestName =
-                                    (data['guestNames'] as List)[index] ?? '';
-                                final guestRelationship =
-                                    (data['guestRelationships']
-                                        as List)[index] ??
-                                    '';
-                                if (guestName.isNotEmpty) {
-                                  return pw.Padding(
-                                    padding: pw.EdgeInsets.only(right: 16),
-                                    child: pw.Text(
-                                      '${index + 1}. ${guestName} (${guestRelationship})'
-                                          .fix(),
-                                      style: pw.TextStyle(
-                                        font: useFont,
-                                        fontSize: 10,
-                                        color: PdfColors.black,
-                                      ),
+                            ...List.generate(guestNames.length, (index) {
+                              final guestName = guestNames[index];
+                              final guestRelationship =
+                                  index < guestRelationships.length
+                                      ? guestRelationships[index]
+                                      : '';
+                              if (guestName.isNotEmpty) {
+                                return pw.Padding(
+                                  padding: pw.EdgeInsets.only(right: 16),
+                                  child: pw.Text(
+                                    '${index + 1}. $guestName ($guestRelationship)'
+                                        .fix(),
+                                    style: pw.TextStyle(
+                                      font: useFont,
+                                      fontSize: 10,
+                                      color: PdfColors.black,
                                     ),
-                                  );
-                                }
-                                return pw.SizedBox.shrink();
-                              },
+                                  ),
+                                );
+                              }
+                              return pw.SizedBox.shrink();
+                            }),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(height: 30),
+                    ] else if (totalGuest == 0) ...[
+                      // Show "No Guests" message when there are no guests
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.grey50,
+                          border: pw.Border.all(
+                            color: PdfColors.grey300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Text(
+                          'কোনো অতিথি নেই'.fix(),
+                          style: pw.TextStyle(
+                            font: useFont2,
+                            fontSize: 12,
+                            color: PdfColors.grey600,
+                            fontStyle: pw.FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 30),
+                    ] else ...[
+                      // Show warning when guest count doesn't match data
+                      pw.Container(
+                        width: double.infinity,
+                        padding: pw.EdgeInsets.all(12),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.orange50,
+                          border: pw.Border.all(
+                            color: PdfColors.orange300,
+                            width: 0.5,
+                          ),
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            pw.Text(
+                              '⚠️',
+                              style: pw.TextStyle(
+                                fontSize: 16,
+                                color: PdfColors.orange600,
+                              ),
+                            ),
+                            pw.SizedBox(width: 8),
+                            pw.Text(
+                              'অতিথির তথ্য অসম্পূর্ণ (${totalGuest} অতিথি, ${guestNames.length} নাম)'
+                                  .fix(),
+                              style: pw.TextStyle(
+                                font: useFont2,
+                                fontSize: 12,
+                                color: PdfColors.orange600,
+                                fontStyle: pw.FontStyle.italic,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      pw.SizedBox(height: 20),
+                      pw.SizedBox(height: 30),
                     ],
-                    pw.SizedBox(height: 20),
                     pw.Column(
                       children: [
                         pw.Row(

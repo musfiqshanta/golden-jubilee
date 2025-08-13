@@ -4,7 +4,6 @@ import '../services/user_service.dart';
 import '../services/payment_service.dart';
 import '../services/donation_service.dart';
 import '../services/counter_service.dart';
-import '../utils/initialize_counters.dart';
 import '../views/admin_registered_page.dart';
 import '../views/admin_approved_users_page.dart';
 import 'donations_screen.dart';

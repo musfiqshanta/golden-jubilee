@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
@@ -312,16 +314,23 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
 
   Future<void> _pickPhoto() async {
     try {
+      print('Starting photo picker...');
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: false,
+        withData: true, // Important: This ensures bytes are available on web
       );
+
+      print('Photo picker result: $result');
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
+        print('Selected file: ${file.name}');
+        print('File size: ${file.size} bytes');
 
         if (file.size > 3 * 1024 * 1024) {
           // 3MB limit
+          print('File too large: ${file.size} bytes');
           setState(() {
             photoError = 'File size must be less than 3MB';
             selectedPhoto = null;
@@ -333,8 +342,12 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
           selectedPhoto = file;
           photoError = null;
         });
+        print('Photo selected successfully');
+      } else {
+        print('No file selected');
       }
     } catch (e) {
+      print('Error in photo picker: $e');
       setState(() {
         photoError = 'Error selecting photo: $e';
         selectedPhoto = null;
@@ -345,13 +358,20 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   Future<String?> _uploadPhoto(File imageFile) async {
     try {
       print('Uploading photo...');
+      print('Selected photo: $selectedPhoto');
 
-      var request = http.MultipartRequest(
+      http.MultipartRequest request = http.MultipartRequest(
         'POST',
-        Uri.parse('https://subornojoyonti.com/api/upload'),
+        Uri.parse('https://jubilee.jahajmarahighschool.com/api/upload.php'),
       );
 
+      // Add the same fields as the working registration process
+      request.fields['phone'] = mobileController.text.trim();
+      request.fields['year'] = sscPassingYear ?? '';
+
+      // Use bytes for web, use file path for mobile/desktop (same logic as registration)
       if (selectedPhoto != null && selectedPhoto!.bytes != null) {
+        print('Uploading using bytes (from memory)');
         request.files.add(
           http.MultipartFile.fromBytes(
             'file',
@@ -359,26 +379,73 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             filename: selectedPhoto!.name,
           ),
         );
-      } else if (selectedPhoto != null &&
+      } else if (!kIsWeb &&
+          selectedPhoto != null &&
           selectedPhoto!.path != null &&
           selectedPhoto!.path!.isNotEmpty) {
+        print('Uploading using file path');
         request.files.add(
           await http.MultipartFile.fromPath('file', selectedPhoto!.path!),
         );
+      } else {
+        print('No valid file to upload');
+        Get.snackbar(
+          'ছবি আপলোড ব্যর্থ',
+          'কোনো বৈধ ছবি পাওয়া যায়নি।',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+        return null;
       }
 
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
+      var res = await request.send();
+      print('Upload response status: ${res.statusCode}');
+      final body = await res.stream.bytesToString();
+      print('Upload response body: \n$body');
 
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(responseData);
-        return jsonData['url'];
+      if (res.statusCode == 200) {
+        try {
+          final decoded = jsonDecode(body);
+          if (decoded is Map && decoded['url'] != null) {
+            return decoded['url'];
+          } else {
+            print('No url in response!');
+            Get.snackbar(
+              'ছবি আপলোড ব্যর্থ',
+              'সার্ভার থেকে সঠিক লিংক পাওয়া যায়নি।',
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            return null;
+          }
+        } catch (e) {
+          print('JSON decode error: $e');
+          Get.snackbar(
+            'ছবি আপলোড ব্যর্থ',
+            'সার্ভার থেকে সঠিক তথ্য পাওয়া যায়নি।',
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return null;
+        }
       } else {
-        print('Upload failed: ${response.statusCode} - $responseData');
+        print('Upload failed with status: ${res.statusCode}');
+        Get.snackbar(
+          'ছবি আপলোড ব্যর্থ',
+          'ছবি আপলোড করা যায়নি (স্ট্যাটাস: ${res.statusCode})',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
         return null;
       }
     } catch (e) {
-      print('Error uploading photo: $e');
+      print('Upload error: $e');
+      Get.snackbar(
+        'ছবি আপলোড ব্যর্থ',
+        'ত্রুটি: $e',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
       return null;
     }
   }
@@ -416,12 +483,41 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       // Handle photo upload
       String? photoUrl = currentPhotoUrl;
       if (selectedPhoto != null) {
-        photoUrl = await _uploadPhoto(File(''));
-        if (photoUrl == null) {
+        try {
+          print('Photo selected: ${selectedPhoto!.name}');
+          print('Platform: ${kIsWeb ? 'Web' : 'Mobile'}');
+
+          // Simple validation - check if photo is selected
+          if (selectedPhoto == null) {
+            setState(() => isLoading = false);
+            Get.snackbar(
+              'ত্রুটি',
+              'ছবি নির্বাচন করুন',
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+            return;
+          }
+
+          // Upload photo using the same method as registration
+          photoUrl = await _uploadPhoto(File(''));
+
+          if (photoUrl == null) {
+            setState(() => isLoading = false);
+            Get.snackbar(
+              'ত্রুটি',
+              'ছবি আপলোড ব্যর্থ হয়েছে',
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+            return;
+          }
+        } catch (e) {
+          print('Photo upload error: $e');
           setState(() => isLoading = false);
           Get.snackbar(
             'ত্রুটি',
-            'ছবি আপলোড ব্যর্থ হয়েছে',
+            'ছবি আপলোডে সমস্যা: $e',
             backgroundColor: Colors.red,
             colorText: Colors.white,
           );
@@ -1118,22 +1214,26 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                   if (selectedPhoto != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
                         children: [
-                          Text(
-                            'File: ${selectedPhoto!.name}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          Text(
-                            'Size: ${(selectedPhoto!.size / 1024).toStringAsFixed(1)} KB',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'File: ${selectedPhoto!.name}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              Text(
+                                'Size: ${(selectedPhoto!.size / 1024).toStringAsFixed(1)} KB',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

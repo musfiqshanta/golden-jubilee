@@ -59,29 +59,29 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
                         //razuiqbal1996@gmail.com
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.auto_fix_high, size: 18),
-                            label: const Text(
-                              'ডেমো ডাটা পূরণ করুন',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueGrey.shade100,
-                              foregroundColor: Colors.black87,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ),
-                            onPressed: controller.fillDemoData,
-                          ),
-                        ),
+                        // MouseRegion(
+                        //   cursor: SystemMouseCursors.click,
+                        //   child: ElevatedButton.icon(
+                        //     icon: const Icon(Icons.auto_fix_high, size: 18),
+                        //     label: const Text(
+                        //       'ডেমো ডাটা পূরণ করুন',
+                        //       style: TextStyle(fontSize: 12),
+                        //     ),
+                        //     style: ElevatedButton.styleFrom(
+                        //       backgroundColor: Colors.blueGrey.shade100,
+                        //       foregroundColor: Colors.black87,
+                        //       padding: const EdgeInsets.symmetric(
+                        //         horizontal: 12,
+                        //         vertical: 8,
+                        //       ),
+                        //       shape: RoundedRectangleBorder(
+                        //         borderRadius: BorderRadius.circular(8),
+                        //       ),
+                        //       elevation: 0,
+                        //     ),
+                        //     onPressed: controller.fillDemoData,
+                        //   ),
+                        // ),
                       ],
                     ),
                     const SizedBox(height: 8),

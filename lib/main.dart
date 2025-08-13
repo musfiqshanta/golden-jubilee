@@ -34,7 +34,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set environment - change this to Environment.development for testing
-  CollectionConfig.setEnvironment(Environment.development);
+  CollectionConfig.setEnvironment(Environment.production);
 
   // Initialize Firebase (same project, different collections)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -338,6 +338,34 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                     letterSpacing: 1,
                   ),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // Registration Remaining Notice
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    'নিবন্ধনের সময় সীমিত - দেরি না করে আজই নিবন্ধন করুন',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize:
+                          MediaQuery.of(context).size.width > 600 ? 16 : 14,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 30),
                 // Calendar-style Countdown (white background, golden text)
@@ -1330,6 +1358,47 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
             '© ২০২৪ সুবর্ণজয়ন্তী উদযাপন। সর্বস্বত্ব সংরক্ষিত।',
             style: TextStyle(color: Colors.white70, fontSize: 14),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 15),
+
+          // Design and Development Credit
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Design and develop by ',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () async {
+                    const url = 'https://teamxbd.com';
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
+                  child: Text(
+                    'teamxbd',
+                    style: TextStyle(
+                      color: const Color(0xFFFF5722),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                      decorationColor: const Color(0xFFFF5722),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
