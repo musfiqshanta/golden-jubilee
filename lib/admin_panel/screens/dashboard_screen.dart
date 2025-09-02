@@ -7,6 +7,7 @@ import '../services/counter_service.dart';
 import '../views/admin_registered_page.dart';
 import '../views/admin_approved_users_page.dart';
 import 'donations_screen.dart';
+import '../../config/app_config.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -67,13 +68,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Dashboard')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Text('Admin Dashboard'),
+            if (AppConfig.showDevModeIndicator) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'DEV MODE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
       drawer: const AdminDrawer(selectedRoute: '/admin/dashboard'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (AppConfig.showDevModeIndicator) _buildDevModeBanner(),
             LayoutBuilder(
               builder: (context, constraints) {
                 int crossAxisCount = 2;
@@ -382,6 +408,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       children:
           items.map((item) => ListTile(title: Text(getTitle(item)))).toList(),
+    );
+  }
+
+  /// Build development mode banner
+  Widget _buildDevModeBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade100,
+        border: Border.all(color: Colors.orange.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.developer_mode, color: Colors.orange.shade700, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Development Mode: Showing test data instead of real Firebase data',
+              style: TextStyle(
+                color: Colors.orange.shade800,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

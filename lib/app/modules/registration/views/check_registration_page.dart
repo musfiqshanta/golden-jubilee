@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 import 'package:suborno_joyonti/app/modules/registration/views/update_registration_page.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
+import 'package:suborno_joyonti/services/sslcommerz_service.dart';
 
 class CheckRegistrationPage extends StatefulWidget {
   const CheckRegistrationPage({super.key});
@@ -455,7 +456,11 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 MouseRegion(
-                                  cursor: SystemMouseCursors.click,
+                                  cursor:
+                                      (foundRegistration!['paymentStatus'] ==
+                                              'approved')
+                                          ? SystemMouseCursors.click
+                                          : SystemMouseCursors.forbidden,
                                   child: ElevatedButton.icon(
                                     icon: const Icon(Icons.picture_as_pdf),
                                     label: const Text(
@@ -465,43 +470,11 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(0xFF8B6914),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    onPressed:
-                                        () => _downloadRegistrationPdf(
-                                          foundRegistration!,
-                                        ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                MouseRegion(
-                                  cursor:
-                                      (foundRegistration!['paymentStatus'] ==
-                                              'approved')
-                                          ? SystemMouseCursors.forbidden
-                                          : SystemMouseCursors.click,
-                                  child: ElevatedButton.icon(
-                                    icon: const Icon(Icons.edit),
-                                    label: const Text(
-                                      'তথ্য আপডেট করুন',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
                                       backgroundColor:
                                           (foundRegistration!['paymentStatus'] ==
                                                   'approved')
-                                              ? Colors.grey
-                                              : Color(0xFFD4AF37),
+                                              ? const Color(0xFF8B6914)
+                                              : Colors.grey,
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 24,
@@ -514,56 +487,68 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                     onPressed:
                                         (foundRegistration!['paymentStatus'] ==
                                                 'approved')
-                                            ? () {
-                                              Get.snackbar(
-                                                'সতর্কতা',
-                                                'পেমেন্ট সম্পন্ন হওয়ার পর তথ্য আপডেট করা যায় না',
-                                                backgroundColor: Colors.orange,
-                                                colorText: Colors.white,
-                                                duration: const Duration(
-                                                  seconds: 3,
-                                                ),
-                                              );
-                                            }
-                                            : () async {
-                                              print('Opening update page...');
-                                              final result = await Get.to(
-                                                () => UpdateRegistrationPage(
-                                                  batchId: selectedBatch!,
-                                                  phone:
-                                                      phoneController.text
-                                                          .trim(),
-                                                  registrationData:
-                                                      foundRegistration!,
-                                                ),
-                                              );
+                                            ? () => _downloadRegistrationPdf(
+                                              foundRegistration!,
+                                            )
+                                            : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.edit),
+                                    label: const Text(
+                                      'তথ্য আপডেট করুন',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD4AF37),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      print('Opening update page...');
+                                      final result = await Get.to(
+                                        () => UpdateRegistrationPage(
+                                          batchId: selectedBatch!,
+                                          phone: phoneController.text.trim(),
+                                          registrationData: foundRegistration!,
+                                        ),
+                                      );
 
-                                              print(
-                                                'Update page returned with result: $result',
-                                              );
+                                      print(
+                                        'Update page returned with result: $result',
+                                      );
 
-                                              // If update was successful, refresh the data
-                                              if (result == true) {
-                                                print(
-                                                  'Update successful, refreshing data...',
-                                                );
-                                                // Clear current data first
-                                                setState(() {
-                                                  foundRegistration = null;
-                                                  hasSearched = false;
-                                                });
-                                                // Wait a moment then refresh
-                                                await Future.delayed(
-                                                  const Duration(
-                                                    milliseconds: 500,
-                                                  ),
-                                                );
-                                                await _checkRegistration();
-                                                print('Data refresh completed');
-                                              } else {
-                                                print('Update result: $result');
-                                              }
-                                            },
+                                      // If update was successful, refresh the data
+                                      if (result == true) {
+                                        print(
+                                          'Update successful, refreshing data...',
+                                        );
+                                        // Clear current data first
+                                        setState(() {
+                                          foundRegistration = null;
+                                          hasSearched = false;
+                                        });
+                                        // Wait a moment then refresh
+                                        await Future.delayed(
+                                          const Duration(milliseconds: 500),
+                                        );
+                                        await _checkRegistration();
+                                        print('Data refresh completed');
+                                      } else {
+                                        print('Update result: $result');
+                                      }
+                                    },
                                   ),
                                 ),
                               ],
@@ -669,31 +654,76 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Download PDF button at the top
-          Align(
-            alignment: Alignment.centerRight,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text(
-                  'ডাউনলোড পিডিএফ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF8B6914),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 10,
+          // Action buttons row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Pay Now button (only for pending payments)
+              if (paymentStatus == 'pending') ...[
+                Expanded(
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.payment, size: 20),
+                      label: const Text(
+                        'এখনই পেমেন্ট করুন',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CAF50),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () => _payNow(registration),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                ),
+                const SizedBox(width: 10),
+              ],
+              // Download PDF button
+              Expanded(
+                child: MouseRegion(
+                  cursor:
+                      (paymentStatus == 'approved')
+                          ? SystemMouseCursors.click
+                          : SystemMouseCursors.forbidden,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text(
+                      'ডাউনলোড পিডিএফ',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          (paymentStatus == 'approved')
+                              ? const Color(0xFF8B6914)
+                              : Colors.grey,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed:
+                        (paymentStatus == 'approved')
+                            ? () => _downloadRegistrationPdf(registration)
+                            : null,
                   ),
                 ),
-                onPressed: () => _downloadRegistrationPdf(registration),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 10),
           Row(
@@ -790,6 +820,61 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          // Transaction Fee Note - Only show for pending payments
+          if (paymentStatus == 'pending')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE3F2FD).withOpacity(0.8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF2196F3).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Color(0xFF2196F3),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'অনলাইন পেমেন্টের জন্য ২.৫% লেনদেন ফি যোগ হবে',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF1976D2),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2196F3).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFF2196F3).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      'মোট পরিশোধযোগ্য: ৳${(totalPayable * 1.025).round()}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF1976D2),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 15),
           if (photoUrl != null && photoUrl.isNotEmpty)
             Center(
@@ -919,6 +1004,124 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
       setState(() {
         _isPdfLoading = false;
       });
+    }
+  }
+
+  /// Handle Pay Now functionality for pending registrations
+  void _payNow(Map<String, dynamic> registration) async {
+    try {
+      // Calculate total amount (including transaction fee if not already calculated)
+      int totalAmount = registration['totalPayable'] ?? 0;
+
+      // If totalPayable doesn't include transaction fee, calculate it
+      if (registration['baseAmount'] == null) {
+        final baseAmount = registration['totalPayable'] ?? 0;
+        final transactionFee = (baseAmount * 0.025).round();
+        totalAmount = baseAmount + transactionFee;
+      }
+
+      // Create payment request using existing registration data
+      final paymentRequest = SSLCommerzService.createRegistrationPayment(
+        registrationData: registration,
+        amount: totalAmount.toDouble(),
+      );
+
+      // Launch payment
+      await SSLCommerzService.launchPayment(
+        context: context,
+        request: paymentRequest,
+        onSuccess: (paymentData) async {
+          debugPrint('Payment successful: $paymentData');
+
+          // Show success dialog
+          SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+
+          // Update registration with payment information
+          await _updateRegistrationAfterPayment(registration, paymentData);
+        },
+        onFailure: (errorData) {
+          debugPrint('Payment failed: $errorData');
+          SSLCommerzService.showPaymentFailureDialog(context, errorData);
+        },
+        onCancel: (cancelData) {
+          debugPrint('Payment cancelled: $cancelData');
+          Get.snackbar(
+            'পেমেন্ট বাতিল',
+            'পেমেন্ট বাতিল করা হয়েছে',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Payment initiation error: $e');
+      Get.snackbar(
+        'ত্রুটি',
+        'পেমেন্ট শুরু করতে সমস্যা হয়েছে: $e',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  /// Update registration after successful payment
+  Future<void> _updateRegistrationAfterPayment(
+    Map<String, dynamic> registration,
+    Map<String, dynamic> paymentData,
+  ) async {
+    try {
+      // Show loading
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
+      // Update payment information
+      final updatedData = Map<String, dynamic>.from(registration);
+      updatedData['paymentStatus'] = 'approved';
+      updatedData['paymentData'] = paymentData;
+      updatedData['paymentTimestamp'] = DateTime.now().toIso8601String();
+
+      // Save to Firestore
+      final batch = registration['batch'] as String;
+      final phone = registration['mobile'] as String;
+
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(batch)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(phone)
+          .update(updatedData);
+
+      // Close loading dialog
+      Get.back();
+
+      // Update local state
+      setState(() {
+        foundRegistration = updatedData;
+      });
+
+      // Show success message
+      Get.snackbar(
+        'সফল',
+        'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে এবং নিবন্ধন অনুমোদিত হয়েছে!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } catch (error) {
+      // Close loading dialog if still open
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      debugPrint('Update registration error: $error');
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন আপডেট করতে সমস্যা হয়েছে: $error',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
     }
   }
 }

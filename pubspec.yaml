@@ -59,6 +59,10 @@ dependencies:
   path: ^1.8.3
   firebase_auth: 6.0.1
 
+  # SSLCommerz payment gateway
+  flutter_sslcommerz: ^2.5.1
+  webview_flutter: ^4.13.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

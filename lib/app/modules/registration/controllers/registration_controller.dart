@@ -19,6 +19,7 @@ import 'package:suborno_joyonti/app/services/pdf_service_web.dart'
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
 import 'package:suborno_joyonti/admin_panel/services/counter_service.dart';
+import 'package:suborno_joyonti/services/sslcommerz_service.dart';
 
 class RegistrationController extends GetxController {
   // Form controllers
@@ -156,7 +157,6 @@ class RegistrationController extends GetxController {
     'অন্যান্য',
   ];
   final List<String> sscPassingYears = [
-  
     '1972',
     '1973',
     '1974',
@@ -315,7 +315,7 @@ class RegistrationController extends GetxController {
         Uri.parse('https://jubilee.jahajmarahighschool.com/api/upload.php'),
       );
       request.fields['phone'] = mobileController.text.trim();
-      request.fields['year'] = selectedSscPassingYear.value ?? '';
+      request.fields['year'] = selectedSscPassingYear.value;
       // Use bytes for web, use file path for mobile/desktop
       if (selectedPhoto.value != null && selectedPhoto.value!.bytes != null) {
         print('Uploading using bytes (from memory)');
@@ -457,6 +457,328 @@ class RegistrationController extends GetxController {
     // Clear guest details
     guestNames.clear();
     guestRelationships.clear();
+  }
+
+  /// Launch payment flow for registration
+  Future<void> launchRegistrationPayment() async {
+    // Validate form first
+    if (!formKey.currentState!.validate()) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুগ্রহ করে সব প্রয়োজনীয় তথ্য পূরণ করুন',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Validate photo upload
+    if (selectedPhoto.value == null) {
+      photoError.value = 'ছবি আপলোড করা বাধ্যতামূলক';
+      Get.snackbar(
+        'ত্রুটি',
+        'ছবি আপলোড করা বাধ্যতামূলক',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final isRunning = isRunningStudent.value;
+
+    // Validate that a valid batch/year is selected
+    if (!isRunning &&
+        (selectedSscPassingYear.value.isEmpty ||
+            selectedSscPassingYear.value == 'None')) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুগ্রহ করে একটি বৈধ এসএসসি পাশের বছর নির্বাচন করুন',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (isRunning &&
+        (selectedFinalClass.value.isEmpty ||
+            selectedFinalClass.value == 'None')) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুগ্রহ করে একটি বৈধ শ্রেণি নির্বাচন করুন',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Validate guest names if guests are added
+    final totalGuests = spouseCount.value + childCount.value;
+    if (totalGuests > 0) {
+      for (int i = 0; i < totalGuests; i++) {
+        if (i < guestNames.length && guestNames[i].trim().isEmpty) {
+          Get.snackbar(
+            'ত্রুটি',
+            'অনুগ্রহ করে সব অতিথির নাম পূরণ করুন',
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
+    }
+
+    final batch =
+        isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
+    final phone = mobileController.text.trim();
+
+    // Check if phone number already exists in the same batch
+    try {
+      final existingDoc =
+          await FirebaseFirestore.instance
+              .collection(CollectionConfig.batchesCollection)
+              .doc(batch)
+              .collection(CollectionConfig.registrationsCollection)
+              .doc(phone)
+              .get();
+
+      if (existingDoc.exists) {
+        Get.snackbar(
+          'ত্রুটি',
+          'এই মোবাইল নম্বরটি ইতিমধ্যে এই ব্যাচে নিবন্ধিত হয়েছে। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন।',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+        return;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন যাচাইকরণে সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Calculate total amount
+    final registrationData = _collectRegistrationData(batch);
+    final baseAmount = registrationData['totalPayable'] as int;
+
+    // Add 2.5% transaction charge
+    final transactionFee = (baseAmount * 0.025).round();
+    final totalAmount = baseAmount + transactionFee;
+
+    // Update registration data with transaction fee details
+    registrationData['baseAmount'] = baseAmount;
+    registrationData['transactionFee'] = transactionFee;
+    registrationData['totalPayable'] = totalAmount;
+
+    // Create payment request
+    final paymentRequest = SSLCommerzService.createRegistrationPayment(
+      registrationData: registrationData,
+      amount: totalAmount.toDouble(),
+    );
+
+    // Launch payment
+    await SSLCommerzService.launchPayment(
+      context: Get.context!,
+      request: paymentRequest,
+      onSuccess: (paymentData) async {
+        debugPrint('Payment successful: $paymentData');
+
+        // Show success dialog
+        SSLCommerzService.showPaymentSuccessDialog(Get.context!, paymentData);
+
+        // Submit form data after successful payment
+        await _submitRegistrationAfterPayment(registrationData, paymentData);
+      },
+      onFailure: (errorData) {
+        debugPrint('Payment failed: $errorData');
+        SSLCommerzService.showPaymentFailureDialog(Get.context!, errorData);
+      },
+      onCancel: (cancelData) {
+        debugPrint('Payment cancelled: $cancelData');
+        Get.snackbar(
+          'পেমেন্ট বাতিল',
+          'পেমেন্ট বাতিল করা হয়েছে',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      },
+    );
+  }
+
+  /// Submit registration data after successful payment
+  Future<void> _submitRegistrationAfterPayment(
+    Map<String, dynamic> registrationData,
+    Map<String, dynamic> paymentData,
+  ) async {
+    try {
+      isLoading.value = true;
+
+      // Show loading dialog
+      Get.dialog(
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                ),
+                SizedBox(height: 24),
+                Text(
+                  'তথ্য সংরক্ষণ হচ্ছে এবং PDF জেনারেট হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF8B6914),
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.none,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Upload photo first
+      String? photoUrl;
+      if (selectedPhoto.value != null) {
+        try {
+          if (!kIsWeb &&
+              selectedPhoto.value!.path != null &&
+              selectedPhoto.value!.path!.isNotEmpty) {
+            photoUrl = await uploadPhoto(File(selectedPhoto.value!.path!));
+          } else {
+            photoUrl = await uploadPhoto(File(''));
+          }
+          if (photoUrl == null) {
+            Get.back(); // Dismiss loading
+            Get.snackbar(
+              'ছবি আপলোড ব্যর্থ',
+              'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            isLoading.value = false;
+            return;
+          }
+        } catch (e) {
+          Get.back(); // Dismiss loading
+          Get.snackbar(
+            'ছবি আপলোড ব্যর্থ',
+            'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          isLoading.value = false;
+          return;
+        }
+      }
+
+      // Add payment information to registration data
+      registrationData['paymentStatus'] = 'approved';
+      registrationData['paymentData'] = paymentData;
+      registrationData['paymentTimestamp'] = DateTime.now().toIso8601String();
+      if (photoUrl != null) {
+        registrationData['photoUrl'] = photoUrl;
+      }
+
+      // Get form serial number
+      final batch = registrationData['batch'] as String;
+      final counterRef = FirebaseFirestore.instance
+          .collection('counters')
+          .doc('registration');
+      int formSerialNumber = 1;
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(counterRef);
+        if (snapshot.exists) {
+          formSerialNumber = (snapshot.data()?['value'] ?? 0) + 1;
+          transaction.update(counterRef, {'value': formSerialNumber});
+        } else {
+          transaction.set(counterRef, {'value': 1});
+          formSerialNumber = 1;
+        }
+      });
+      registrationData['formSerialNumber'] = formSerialNumber;
+
+      // Save to Firestore
+      final phone = mobileController.text.trim();
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(batch)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(phone)
+          .set(registrationData);
+
+      // Update counters
+      try {
+        final counterService = CounterService();
+        await counterService.incrementTotalRegistrations();
+
+        final int guestCount = spouseCount.value + childCount.value;
+        if (guestCount > 0) {
+          await counterService.updateTotalGuests(guestCount);
+        }
+      } catch (e) {
+        print('Warning: Failed to update counters: $e');
+      }
+
+      // Generate and download PDF
+      try {
+        await PdfService.generateRegistrationPdfFromData(
+          registrationData,
+          onBeforeOpen: () {
+            if (Get.isDialogOpen ?? false) Get.back();
+          },
+        );
+      } catch (e) {
+        print('PDF generation error: $e');
+        Get.snackbar(
+          'সতর্কতা',
+          'নিবন্ধন সফল হয়েছে কিন্তু পিডিএফ তৈরি করতে সমস্যা হয়েছে',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+
+      // Clear form
+      clearForm();
+
+      Get.snackbar(
+        'সফল',
+        'নিবন্ধন সফলভাবে সম্পন্ন হয়েছে এবং পেমেন্ট গ্রহণ করা হয়েছে!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } catch (error) {
+      Get.back(); // Dismiss loading on error
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন সংরক্ষণে সমস্যা হয়েছে: $error',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Future<void> saveRegistration() async {
@@ -979,16 +1301,7 @@ class RegistrationController extends GetxController {
       final logoData = await rootBundle.load('assets/logo.png');
       final logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
 
-      // Load uploaded photo if available
-      pw.MemoryImage? userPhoto;
-      if (selectedPhoto.value != null && selectedPhoto.value!.bytes != null) {
-        userPhoto = pw.MemoryImage(selectedPhoto.value!.bytes!);
-      }
-
       final registrationDate = DateTime.now();
-      final batch =
-          isRunningStudent.value ? 'Running' : selectedSscPassingYear.value;
-      final regTimestamp = registrationDate.toIso8601String();
 
       // Calculate total guest and total amount before PDF generation
       int totalGuest = spouseCount.value + childCount.value;
@@ -1533,23 +1846,6 @@ class RegistrationController extends GetxController {
           ),
           pw.TextSpan(text: ' ', style: pw.TextStyle(fontSize: 11)),
           pw.TextSpan(text: value.fix(), style: pw.TextStyle(fontSize: 11)),
-        ],
-      ),
-    );
-  }
-
-  // Helper method for PDF info rows
-  pw.Widget _buildPdfInfoRow(String label, String value, pw.Font font) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 3),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 120,
-            child: pw.Text(_safeFix(label), style: pw.TextStyle(font: font)),
-          ),
-          pw.Text(': ${_safeFix(value)}', style: pw.TextStyle(font: font)),
         ],
       ),
     );

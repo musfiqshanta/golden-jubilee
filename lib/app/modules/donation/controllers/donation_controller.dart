@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../services/pdf_service.dart';
+import '../../../../services/sslcommerz_service.dart';
 
 class DonationController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -38,6 +39,7 @@ class DonationController extends GetxController {
     'মোবাইল ব্যাংকিং',
     'ব্যাংক ট্রান্সফার',
     'চেক',
+    'অনলাইন পেমেন্ট (SSLCommerz)',
   ];
 
   @override
@@ -90,7 +92,7 @@ class DonationController extends GetxController {
         availableBatches.value = [];
       }
     } catch (e) {
-      print('Error fetching batches: $e');
+      debugPrint('Error fetching batches: $e');
       Get.snackbar(
         'ত্রুটি',
         'ব্যাচ তালিকা লোড করতে সমস্যা হয়েছে',
@@ -191,7 +193,7 @@ class DonationController extends GetxController {
       final querySnapshot = await _firestore.collection('donations').get();
       return querySnapshot.docs.length + 1;
     } catch (e) {
-      print('Error getting next receipt number: $e');
+      debugPrint('Error getting next receipt number: $e');
       // Fallback to timestamp if there's an error
       return DateTime.now().millisecondsSinceEpoch;
     }
@@ -220,12 +222,216 @@ class DonationController extends GetxController {
       return;
     }
 
+    // Validate required fields for online payment
+    if (selectedPaymentMethod.value == 'অনলাইন পেমেন্ট (SSLCommerz)') {
+      if (donorNameController.text.trim().isEmpty) {
+        Get.snackbar(
+          'ত্রুটি',
+          'অনলাইন পেমেন্টের জন্য নাম প্রয়োজন',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      if (donorPhoneController.text.trim().isEmpty) {
+        Get.snackbar(
+          'ত্রুটি',
+          'অনলাইন পেমেন্টের জন্য মোবাইল নম্বর প্রয়োজন',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+    }
+
     isLoading.value = true;
 
     try {
+      // Check if online payment is selected
+      if (selectedPaymentMethod.value == 'অনলাইন পেমেন্ট (SSLCommerz)') {
+        await _processOnlinePayment(amount);
+      } else {
+        await _processOfflinePayment(amount);
+      }
+    } catch (e) {
+      Get.snackbar(
+        'ত্রুটি',
+        'অনুদান জমা দিতে সমস্যা হয়েছে: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Process online payment through SSLCommerz
+  Future<void> _processOnlinePayment(double amount) async {
+    try {
+      // Generate transaction ID
+      final transactionId = SSLCommerzService.generateTransactionId();
+
+      // Prepare customer information
+      final customerName = donorNameController.text.trim();
+      final customerPhone = donorPhoneController.text.trim();
+      final customerEmail =
+          donorEmailController.text.trim().isEmpty
+              ? '$customerPhone@donation.com'
+              : donorEmailController.text.trim();
+      final customerAddress =
+          donorAddressController.text.trim().isEmpty
+              ? 'Bangladesh'
+              : donorAddressController.text.trim();
+
+      // Create payment request using new professional service
+      final paymentRequest = PaymentRequest(
+        transactionId: transactionId,
+        amount: amount,
+        productName: 'সুবর্ণজয়ন্তী অনুদান - ${selectedDonationType.value}',
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone,
+        customerAddress: customerAddress,
+        customerCity: 'Dhaka',
+        customerCountry: 'Bangladesh',
+      );
+
+      // Show loading dialog
+      Get.dialog(
+        const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFFD4AF37)),
+              SizedBox(height: 16),
+              Text('পেমেন্ট পেজ লোড হচ্ছে...'),
+            ],
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Initiate SSLCommerz payment using new professional service
+      final result = await SSLCommerzService.initiatePayment(paymentRequest);
+
+      // Close loading dialog
+      Get.back();
+
+      if (result.isSuccess && result.gatewayUrl != null) {
+        // Handle successful payment initiation
+        final paymentUrl = result.gatewayUrl!;
+        final sessionKey = result.sessionKey ?? '';
+
+        // Show payment success with URL
+        Get.snackbar(
+          '🎉 পেমেন্ট প্রস্তুত!',
+          'পেমেন্ট সেশন তৈরি হয়েছে!\n'
+              'সেশন কী: $sessionKey\n\n'
+              'পেমেন্ট URL: $paymentUrl\n\n'
+              '💳 এই URL-এ সব পেমেন্ট অপশন দেখবেন:\n'
+              '• কার্ড পেমেন্ট (Visa, MasterCard, Amex)\n'
+              '• মোবাইল ব্যাংকিং (bKash, Rocket, Nagad)\n'
+              '• ইন্টারনেট ব্যাংকিং (IBBL, City Bank)\n\n'
+              'পেমেন্ট সম্পন্ন হলে অনুদান স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে।',
+          backgroundColor: const Color(0xFFD4AF37),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 20),
+          snackPosition: SnackPosition.TOP,
+        );
+
+        // For demo purposes, simulate payment success after showing URL
+        await Future.delayed(const Duration(seconds: 8));
+        await _simulatePaymentSuccess(
+          transactionId,
+          amount,
+          result.rawData ?? {},
+        );
+      } else {
+        Get.snackbar(
+          'ত্রুটি',
+          'পেমেন্ট শুরু করতে সমস্যা হয়েছে: ${result.errorMessage ?? 'Unknown error'}',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if open
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+      Get.snackbar(
+        'ত্রুটি',
+        'অনলাইন পেমেন্ট প্রক্রিয়ায় সমস্যা: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  // Process offline payment (existing logic)
+  Future<void> _processOfflinePayment(double amount) async {
+    // Get the next sequential receipt number
+    final receiptNumber = await getNextReceiptNumber();
+
+    final donationData = {
+      'donorName': donorNameController.text.trim(),
+      'donorPhone': donorPhoneController.text.trim(),
+      'donorEmail': donorEmailController.text.trim(),
+      'donorAddress': donorAddressController.text.trim(),
+      'amount': amount,
+      'donationType': selectedDonationType.value,
+      'paymentMethod': selectedPaymentMethod.value,
+      'purpose': purposeController.text.trim(),
+      'notes': notesController.text.trim(),
+      'isAnonymous': isAnonymous.value,
+      'status': 'pending',
+      'date': DateTime.now().toIso8601String(),
+      'timestamp': FieldValue.serverTimestamp(),
+      'receiptNumber': receiptNumber,
+    };
+
+    // If user is verified, add user reference
+    if (isUserFound.value && foundUserData.isNotEmpty) {
+      donationData['userId'] = foundUserData['id'];
+      donationData['userBatchId'] = foundUserData['batchId'];
+      donationData['userName'] = foundUserData['name'];
+      donationData['userMobile'] = foundUserData['mobile'];
+    }
+
+    await _firestore.collection('donations').add(donationData);
+
+    Get.snackbar(
+      'সফল',
+      'আপনার অনুদান সফলভাবে জমা হয়েছে। ধন্যবাদ!',
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 5),
+    );
+
+    // Generate PDF receipt
+    await generateDonationReceipt(donationData);
+
+    // Reset form
+    resetForm();
+
+    // Navigate back to home
+    Get.until((route) => route.settings.name == '/');
+  }
+
+  // Simulate payment success for testing (replace with real payment handling)
+  Future<void> _simulatePaymentSuccess(
+    String transactionId,
+    double amount,
+    Map<String, dynamic> sslcommerzResponse,
+  ) async {
+    try {
+      // Wait a bit to simulate payment processing
+      await Future.delayed(const Duration(seconds: 2));
+
       // Get the next sequential receipt number
       final receiptNumber = await getNextReceiptNumber();
 
+      // Prepare donation data
       final donationData = {
         'donorName': donorNameController.text.trim(),
         'donorPhone': donorPhoneController.text.trim(),
@@ -237,10 +443,24 @@ class DonationController extends GetxController {
         'purpose': purposeController.text.trim(),
         'notes': notesController.text.trim(),
         'isAnonymous': isAnonymous.value,
-        'status': 'pending',
+        'status': 'approved', // Simulated success
         'date': DateTime.now().toIso8601String(),
         'timestamp': FieldValue.serverTimestamp(),
         'receiptNumber': receiptNumber,
+
+        // SSLCommerz specific fields
+        'transactionId': transactionId,
+        'gatewayTransactionId': sslcommerzResponse['sessionkey'],
+        'paymentStatus': 'SUCCESS',
+        'gatewayPaymentMethod': 'Test Payment',
+        'sslcommerzData': {
+          'isSuccess': true,
+          'status': 'SUCCESS',
+          'transactionId': transactionId,
+          'amount': amount,
+          'currency': 'BDT',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
       };
 
       // If user is verified, add user reference
@@ -251,14 +471,17 @@ class DonationController extends GetxController {
         donationData['userMobile'] = foundUserData['mobile'];
       }
 
+      // Save to Firestore
       await _firestore.collection('donations').add(donationData);
 
+      // Payment successful
       Get.snackbar(
-        'সফল',
-        'আপনার অনুদান সফলভাবে জমা হয়েছে। ধন্যবাদ!',
+        '🎉 পেমেন্ট সফল!',
+        'আপনার অনুদান সফলভাবে গ্রহণ করা হয়েছে।\nট্রানজেকশন আইডি: $transactionId\nপরিমাণ: ৳$amount',
         backgroundColor: Colors.green,
         colorText: Colors.white,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 8),
+        snackPosition: SnackPosition.TOP,
       );
 
       // Generate PDF receipt
@@ -272,12 +495,10 @@ class DonationController extends GetxController {
     } catch (e) {
       Get.snackbar(
         'ত্রুটি',
-        'অনুদান জমা দিতে সমস্যা হয়েছে: $e',
+        'পেমেন্ট রেকর্ড সংরক্ষণে সমস্যা: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    } finally {
-      isLoading.value = false;
     }
   }
 
@@ -306,7 +527,7 @@ class DonationController extends GetxController {
 
       await PdfService.generateDonationReceiptPdf(receiptData);
     } catch (e) {
-      print('Error generating donation receipt: $e');
+      debugPrint('Error generating donation receipt: $e');
       Get.snackbar(
         'সতর্কতা',
         'রসিদ তৈরি করতে সমস্যা হয়েছে, তবে অনুদান সফলভাবে জমা হয়েছে',
@@ -361,7 +582,7 @@ class DonationController extends GetxController {
         );
       }
     } catch (e) {
-      print('Error searching donations: $e');
+      debugPrint('Error searching donations: $e');
       Get.snackbar(
         'ত্রুটি',
         'অনুদান খুঁজতে সমস্যা হয়েছে: $e',

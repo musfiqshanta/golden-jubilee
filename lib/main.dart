@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'widgets/payment_handler.dart';
 import 'app/modules/registration/views/registration_page.dart';
 import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
@@ -34,7 +35,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set environment - change this to Environment.development for testing
-  CollectionConfig.setEnvironment(Environment.production);
+  CollectionConfig.setEnvironment(Environment.development);
 
   // Initialize Firebase (same project, different collections)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -57,93 +58,101 @@ class GoldenJubileeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title:
-          CollectionConfig.isDevelopment
-              ? 'Golden Jubilee (DEV)'
-              : 'Golden Jubilee Celebration',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4AF37), // Golden color
-          brightness: Brightness.light,
+    return PaymentHandler(
+      child: GetMaterialApp(
+        title:
+            CollectionConfig.isDevelopment
+                ? 'Golden Jubilee (DEV)'
+                : 'Golden Jubilee Celebration',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFD4AF37), // Golden color
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+          fontFamily: GoogleFonts.montserrat().fontFamily,
+          textTheme: GoogleFonts.montserratTextTheme(),
         ),
-        useMaterial3: true,
-        fontFamily: GoogleFonts.montserrat().fontFamily,
-        textTheme: GoogleFonts.montserratTextTheme(),
+        initialBinding: RegistrationBinding(),
+        home: const GoldenJubileeHomePage(),
+        debugShowCheckedModeBanner: CollectionConfig.isDevelopment,
+        // Enable clean URLs without hash
+        defaultTransition: Transition.noTransition,
+        routingCallback: (routing) {
+          if (routing?.current != null) {
+            print('Current route: ${routing!.current}');
+          }
+        },
+        // Configure for clean URLs
+        initialRoute: '/',
+        getPages: [
+          GetPage(name: '/', page: () => const GoldenJubileeHomePage()),
+          GetPage(
+            name: '/registration',
+            page: () => RegistrationPage(),
+            binding: RegistrationBinding(),
+          ),
+          GetPage(name: '/registered', page: () => RegisteredPage()),
+          GetPage(name: '/approved-users', page: () => ApprovedUsersPage()),
+          GetPage(
+            name: '/check-registration',
+            page: () => CheckRegistrationPage(),
+          ),
+          // Donation routes
+          GetPage(
+            name: '/donation',
+            page: () => const DonationHomePage(),
+            binding: DonationBinding(),
+          ),
+          GetPage(
+            name: '/donation/verify-user',
+            page: () => const VerifyUserPage(),
+            binding: DonationBinding(),
+          ),
+          GetPage(
+            name: '/donation/anonymous',
+            page: () => const AnonymousDonationPage(),
+            binding: DonationBinding(),
+          ),
+          GetPage(
+            name: '/donation/check',
+            page: () => const CheckDonationPage(),
+            binding: DonationBinding(),
+          ),
+          GetPage(
+            name: '/donation/form',
+            page: () => const DonationFormPage(),
+            binding: DonationBinding(),
+          ),
+          // Admin panel routes
+          GetPage(name: '/admin', page: () => const LoginScreen()),
+          GetPage(
+            name: '/admin/dashboard',
+            page: () => const DashboardScreen(),
+          ),
+          GetPage(name: '/admin/payments', page: () => const PaymentsScreen()),
+          GetPage(
+            name: '/admin/donations',
+            page: () => const DonationsScreen(),
+          ),
+          GetPage(
+            name: '/admin/add-donation',
+            page: () => const AddDonationScreen(),
+          ),
+          GetPage(
+            name: '/admin/edit-donation',
+            page: () => const EditDonationScreen(),
+          ),
+          GetPage(
+            name: '/admin/search-user',
+            page: () => const SearchUserScreen(),
+          ),
+          GetPage(
+            name: '/admin/countdown-settings',
+            page: () => const CountdownSettingsScreen(),
+          ),
+        ],
       ),
-      initialBinding: RegistrationBinding(),
-      home: const GoldenJubileeHomePage(),
-      debugShowCheckedModeBanner: CollectionConfig.isDevelopment,
-      // Enable clean URLs without hash
-      defaultTransition: Transition.noTransition,
-      routingCallback: (routing) {
-        if (routing?.current != null) {
-          print('Current route: ${routing!.current}');
-        }
-      },
-      // Configure for clean URLs
-      initialRoute: '/',
-      getPages: [
-        GetPage(name: '/', page: () => const GoldenJubileeHomePage()),
-        GetPage(
-          name: '/registration',
-          page: () => RegistrationPage(),
-          binding: RegistrationBinding(),
-        ),
-        GetPage(name: '/registered', page: () => RegisteredPage()),
-        GetPage(name: '/approved-users', page: () => ApprovedUsersPage()),
-        GetPage(
-          name: '/check-registration',
-          page: () => CheckRegistrationPage(),
-        ),
-        // Donation routes
-        GetPage(
-          name: '/donation',
-          page: () => const DonationHomePage(),
-          binding: DonationBinding(),
-        ),
-        GetPage(
-          name: '/donation/verify-user',
-          page: () => const VerifyUserPage(),
-          binding: DonationBinding(),
-        ),
-        GetPage(
-          name: '/donation/anonymous',
-          page: () => const AnonymousDonationPage(),
-          binding: DonationBinding(),
-        ),
-        GetPage(
-          name: '/donation/check',
-          page: () => const CheckDonationPage(),
-          binding: DonationBinding(),
-        ),
-        GetPage(
-          name: '/donation/form',
-          page: () => const DonationFormPage(),
-          binding: DonationBinding(),
-        ),
-        // Admin panel routes
-        GetPage(name: '/admin', page: () => const LoginScreen()),
-        GetPage(name: '/admin/dashboard', page: () => const DashboardScreen()),
-        GetPage(name: '/admin/payments', page: () => const PaymentsScreen()),
-        GetPage(name: '/admin/donations', page: () => const DonationsScreen()),
-        GetPage(
-          name: '/admin/add-donation',
-          page: () => const AddDonationScreen(),
-        ),
-        GetPage(
-          name: '/admin/edit-donation',
-          page: () => const EditDonationScreen(),
-        ),
-        GetPage(
-          name: '/admin/search-user',
-          page: () => const SearchUserScreen(),
-        ),
-        GetPage(
-          name: '/admin/countdown-settings',
-          page: () => const CountdownSettingsScreen(),
-        ),
-      ],
     );
   }
 }
@@ -243,6 +252,11 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
         _isLoadingStats = false;
       });
     }
+  }
+
+  // Professional payment integration using SSLCommerzService
+  Future<void> _launchTestPayment() async {
+    await PaymentHelper.launchTestPayment(context, amount: 100.0);
   }
 
   @override
@@ -371,7 +385,50 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 // Calendar-style Countdown (white background, golden text)
                 _buildCalendarCountdownRow(days, hours, minutes, seconds, true),
                 const SizedBox(height: 30),
-                // Buttons Row
+                // Test Payment Button (only show in development) - At the top
+                if (CollectionConfig.isDevelopment)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Center(
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: ElevatedButton(
+                          onPressed: () => _launchTestPayment(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            elevation: 4,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.payment, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'টেস্ট পেমেন্ট (SSLCommerz)',
+                                style: TextStyle(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width > 600
+                                          ? 16.0
+                                          : 14.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Main Buttons Row
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final isVerySmall = constraints.maxWidth < 400;
@@ -547,7 +604,6 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final isMobile = constraints.maxWidth < 500;
-                    final isBigScreen = constraints.maxWidth > 1200;
 
                     final children = [
                       // মোট নিবন্ধন

@@ -59,29 +59,29 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
                         //razuiqbal1996@gmail.com
-                        // MouseRegion(
-                        //   cursor: SystemMouseCursors.click,
-                        //   child: ElevatedButton.icon(
-                        //     icon: const Icon(Icons.auto_fix_high, size: 18),
-                        //     label: const Text(
-                        //       'ডেমো ডাটা পূরণ করুন',
-                        //       style: TextStyle(fontSize: 12),
-                        //     ),
-                        //     style: ElevatedButton.styleFrom(
-                        //       backgroundColor: Colors.blueGrey.shade100,
-                        //       foregroundColor: Colors.black87,
-                        //       padding: const EdgeInsets.symmetric(
-                        //         horizontal: 12,
-                        //         vertical: 8,
-                        //       ),
-                        //       shape: RoundedRectangleBorder(
-                        //         borderRadius: BorderRadius.circular(8),
-                        //       ),
-                        //       elevation: 0,
-                        //     ),
-                        //     onPressed: controller.fillDemoData,
-                        //   ),
-                        // ),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.auto_fix_high, size: 18),
+                            label: const Text(
+                              'ডেমো ডাটা পূরণ করুন',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueGrey.shade100,
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: controller.fillDemoData,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -220,7 +220,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                   Obx(
                     () => _dropdownField(
                       label: 'লিঙ্গ',
-                      value: controller.selectedGender.value ?? '',
+                      value: controller.selectedGender.value,
                       items: ['পুরুষ', 'মহিলা', 'অন্যান্য'],
                       onChanged:
                           (value) =>
@@ -383,7 +383,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                   Obx(
                     () => _dropdownField(
                       label: 'জাতীয়তা',
-                      value: controller.selectedNationality.value ?? '',
+                      value: controller.selectedNationality.value,
                       items: controller.nationalities,
                       onChanged:
                           (value) =>
@@ -395,7 +395,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                   Obx(
                     () => _dropdownField(
                       label: 'ধর্ম',
-                      value: controller.selectedReligion.value ?? '',
+                      value: controller.selectedReligion.value,
                       items: controller.religions,
                       onChanged:
                           (value) =>
@@ -441,9 +441,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                 Expanded(
                                   child: _dropdownField(
                                     label: 'শেষ শ্রেণি',
-                                    value:
-                                        controller.selectedFinalClass.value ??
-                                        '',
+                                    value: controller.selectedFinalClass.value,
                                     items: controller.finalClasses,
                                     onChanged:
                                         (value) =>
@@ -456,7 +454,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                 Expanded(
                                   child: _dropdownField(
                                     label: 'বছর',
-                                    value: controller.selectedYear.value ?? '',
+                                    value: controller.selectedYear.value,
                                     items: controller.years,
                                     onChanged:
                                         (value) =>
@@ -468,8 +466,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                             )
                             : _dropdownField(
                               label: 'এসএসসি পাশের বছর',
-                              value:
-                                  controller.selectedSscPassingYear.value ?? '',
+                              value: controller.selectedSscPassingYear.value,
                               items: controller.sscPassingYears,
                               onChanged:
                                   (value) =>
@@ -752,12 +749,12 @@ class RegistrationPage extends GetView<RegistrationController> {
                   ),
                   const SizedBox(height: 8),
                   Card(
-                    color: const Color(0xFFFFF3E0),
+                    color: const Color(0xFFE8F5E8),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                       side: const BorderSide(
-                        color: Color(0xFFFF9800),
+                        color: Color(0xFF4CAF50),
                         width: 1.5,
                       ),
                     ),
@@ -769,14 +766,14 @@ class RegistrationPage extends GetView<RegistrationController> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.info_outline, color: Color(0xFFFF9800)),
+                          Icon(Icons.payment, color: Color(0xFF4CAF50)),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'নিবন্ধন ফি ব্যাচ প্রতিনিধি বরাবর জমা দিতে হবে।',
+                              'নিবন্ধন ফি অনলাইন পেমেন্টের মাধ্যমে পরিশোধ করতে হবে।\n২.৫% অনলাইন লেনদেন ফি যোগ হবে।',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Color(0xFFBF360C),
+                                color: Color(0xFF2E7D32),
                                 fontWeight: FontWeight.bold,
                               ),
                               textAlign: TextAlign.center,
@@ -958,10 +955,59 @@ class RegistrationPage extends GetView<RegistrationController> {
                   ),
                 ]),
                 const SizedBox(height: 30),
-                // Submit Button
+                // Payment Button
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (controller.formKey.currentState!.validate() &&
+                          controller.selectedTshirtSize.value != null &&
+                          controller.selectedPhoto.value != null) {
+                        await controller.launchRegistrationPayment();
+                      } else if (controller.selectedTshirtSize.value == null) {
+                        Get.snackbar(
+                          'ত্রুটি',
+                          'টি-শার্ট সাইজ নির্বাচন করুন',
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      } else if (controller.selectedPhoto.value == null) {
+                        controller.photoError.value =
+                            'ছবি আপলোড করা বাধ্যতামূলক';
+                        Get.snackbar(
+                          'ত্রুটি',
+                          'ছবি আপলোড করা বাধ্যতামূলক',
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.payment, size: 24),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 15,
+                        horizontal: 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    label: const Text(
+                      'পেমেন্ট করুন এবং নিবন্ধন সম্পন্ন করুন',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                // Alternative Submit Button (for testing without payment)
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
                     onPressed: () async {
                       if (controller.formKey.currentState!.validate() &&
                           controller.selectedTshirtSize.value != null &&
@@ -985,23 +1031,31 @@ class RegistrationPage extends GetView<RegistrationController> {
                         );
                       }
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    icon: const Icon(Icons.save, size: 20),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFD4AF37),
+                      side: const BorderSide(
+                        color: Color(0xFFD4AF37),
+                        width: 2,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 20,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text(
-                      'নিবন্ধন জমা দিন',
+                    label: const Text(
+                      'নিবন্ধন জমা দিন (পেমেন্ট ছাড়া - টেস্টিং)',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
               ],
             ),
@@ -1254,10 +1308,17 @@ class RegistrationPage extends GetView<RegistrationController> {
     final int guestCount =
         controller.spouseCount.value + controller.childCount.value;
     final int guestFee = guestCount * 500;
-    final int total = baseFee + guestFee;
+    final int subtotal = baseFee + guestFee;
+
+    // Calculate 2.5% transaction fee
+    final int transactionFee = (subtotal * 0.025).round();
+    final int total = subtotal + transactionFee;
 
     String details = feeDescription;
     details += '\nপরিবারের সদস্য ($guestCount জন): $guestFee টাকা';
+    details += '\n-----------------------------';
+    details += '\nউপমোট: $subtotal টাকা';
+    details += '\nঅনলাইন লেনদেন ফি (২.৫%): $transactionFee টাকা';
     details += '\n-----------------------------';
     details += '\nমোট: $total টাকা';
     return details;

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../config/app_config.dart';
 
 class DonationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -31,6 +32,14 @@ class DonationService {
   }
 
   Future<double> getTotalApprovedDonations() async {
+    // Use test data in development mode
+    if (AppConfig.useTestData) {
+      print(
+        '🧪 Using test data for approved donations: ${AppConfig.getTestData('totalApprovedDonations')}',
+      );
+      return AppConfig.getTestData('totalApprovedDonations').toDouble();
+    }
+
     final snapshot =
         await _firestore
             .collection('donations')
@@ -46,6 +55,14 @@ class DonationService {
   }
 
   Future<int> getTotalDonationRequests() async {
+    // Use test data in development mode
+    if (AppConfig.useTestData) {
+      print(
+        '🧪 Using test data for donation requests: ${AppConfig.getTestData('totalDonationRequests')}',
+      );
+      return AppConfig.getTestData('totalDonationRequests');
+    }
+
     final snapshot = await _firestore.collection('donations').get();
     return snapshot.docs.length;
   }

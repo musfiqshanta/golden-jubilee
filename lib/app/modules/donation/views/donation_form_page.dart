@@ -279,7 +279,31 @@ class DonationFormPage extends StatelessWidget {
                                     ) {
                                       return DropdownMenuItem<String>(
                                         value: method,
-                                        child: Text(method),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              method ==
+                                                      'অনলাইন পেমেন্ট (SSLCommerz)'
+                                                  ? Icons.credit_card
+                                                  : method == 'নগদ'
+                                                  ? Icons.money
+                                                  : method == 'মোবাইল ব্যাংকিং'
+                                                  ? Icons.phone_android
+                                                  : method ==
+                                                      'ব্যাংক ট্রান্সফার'
+                                                  ? Icons.account_balance
+                                                  : Icons.receipt_long,
+                                              size: 20,
+                                              color:
+                                                  method ==
+                                                          'অনলাইন পেমেন্ট (SSLCommerz)'
+                                                      ? Colors.green
+                                                      : const Color(0xFFD4AF37),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: Text(method)),
+                                          ],
+                                        ),
                                       );
                                     }).toList(),
                                 onChanged: (String? newValue) {
@@ -289,6 +313,82 @@ class DonationFormPage extends StatelessWidget {
                                   }
                                 },
                               ),
+
+                              // Online Payment Information Card
+                              Obx(() {
+                                if (controller.selectedPaymentMethod.value ==
+                                    'অনলাইন পেমেন্ট (SSLCommerz)') {
+                                  return Container(
+                                    margin: const EdgeInsets.only(top: 15),
+                                    padding: const EdgeInsets.all(15),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.green.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              color: Colors.green[700],
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'অনলাইন পেমেন্ট তথ্য',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green[700],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          '• ভিসা, মাস্টারকার্ড, আমেরিকান এক্সপ্রেস কার্ড গ্রহণযোগ্য\n'
+                                          '• বিকাশ, রকেট, নগদ, উপায় মোবাইল ব্যাংকিং\n'
+                                          '• সকল প্রধান ব্যাংকের ইন্টারনেট ব্যাংকিং\n'
+                                          '• নিরাপদ ও দ্রুত পেমেন্ট প্রক্রিয়া\n'
+                                          '• তাৎক্ষণিক রসিদ ও নিশ্চিতকরণ',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.green[600],
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'SSL নিরাপত্তা সুরক্ষিত',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              }),
                               const SizedBox(height: 20),
 
                               // Purpose

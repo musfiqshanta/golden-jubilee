@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../config/app_config.dart';
 
 class CounterService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -102,7 +103,25 @@ class CounterService {
   // Optimized method to get all statistics in one query
   Future<Map<String, dynamic>> getAllStatistics() async {
     try {
-      print('📊 Getting all statistics in optimized way...');
+      print('🔍 Checking development mode...');
+      AppConfig.testConfig();
+
+      // Check if we should use test data in development mode
+      if (AppConfig.useTestData) {
+        print('🧪 Using test data for development mode');
+        AppConfig.printConfig();
+
+        final testData = AppConfig.getAllTestData();
+        print('✅ Test statistics loaded:');
+        print('   Total Registrations: ${testData['totalRegistrations']}');
+        print('   Total Guests: ${testData['totalGuests']}');
+        print('   Total Approved Users: ${testData['totalApprovedUsers']}');
+        print('   Total Collections: ৳${testData['totalCollections']}');
+
+        return testData;
+      }
+
+      print('📊 Getting all statistics from Firebase...');
 
       // Get all registrations once and calculate everything
       final snapshot = await _firestore.collectionGroup('registrations').get();
@@ -127,7 +146,7 @@ class CounterService {
         }
       }
 
-      print('✅ All statistics calculated:');
+      print('✅ All statistics calculated from Firebase:');
       print('   Total Registrations: $totalRegistrations');
       print('   Total Guests: $totalGuests');
       print('   Total Approved Users: $totalApprovedUsers');

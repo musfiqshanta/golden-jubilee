@@ -532,7 +532,7 @@ class PdfService {
                             ),
                             pw.SizedBox(width: 8),
                             pw.Text(
-                              'অতিথির তথ্য অসম্পূর্ণ (${totalGuest} অতিথি, ${guestNames.length} নাম)'
+                              'অতিথির তথ্য অসম্পূর্ণ ($totalGuest অতিথি, ${guestNames.length} নাম)'
                                   .fix(),
                               style: pw.TextStyle(
                                 font: useFont2,
@@ -816,7 +816,7 @@ class PdfService {
                             ),
                             pw.SizedBox(width: 8),
                             pw.Text(
-                              'অতিথির তথ্য অসম্পূর্ণ (${totalGuest} অতিথি, ${guestNames.length} নাম)'
+                              'অতিথির তথ্য অসম্পূর্ণ ($totalGuest অতিথি, ${guestNames.length} নাম)'
                                   .fix(),
                               style: pw.TextStyle(
                                 font: useFont2,

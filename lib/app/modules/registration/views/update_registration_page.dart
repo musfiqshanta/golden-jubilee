@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:suborno_joyonti/services/sslcommerz_service.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
@@ -71,6 +72,11 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   // Loading state
   bool isLoading = false;
   bool isDeleting = false;
+
+  // Payment status and guest count tracking
+  String? paymentStatus;
+  int originalSpouseCount = 0;
+  int originalChildCount = 0;
 
   // Dropdown lists
   final List<String> tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -281,6 +287,13 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     spouseCount = d['spouseCount'] ?? 0;
     childCount = d['childCount'] ?? 0;
 
+    // Store original values for comparison
+    originalSpouseCount = spouseCount;
+    originalChildCount = childCount;
+
+    // Payment status
+    paymentStatus = d['paymentStatus'] ?? 'pending';
+
     // Guest details
     guestNames = List<String>.from(d['guestNames'] ?? []);
     guestRelationships = List<String>.from(d['guestRelationships'] ?? []);
@@ -307,7 +320,6 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   }
 
   void _updateGuestDetails() {
-    final totalGuests = spouseCount + childCount;
     _initializeGuestDetails();
     setState(() {});
   }
@@ -471,6 +483,18 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       return;
     }
 
+    // Check if additional guests were added after payment approval
+    if (paymentStatus == 'approved') {
+      final currentTotalGuests = spouseCount + childCount;
+      final originalTotalGuests = originalSpouseCount + originalChildCount;
+
+      if (currentTotalGuests > originalTotalGuests) {
+        // Additional guests added - need payment
+        await _handleAdditionalGuestPayment();
+        return;
+      }
+    }
+
     setState(() => isLoading = true);
 
     try {
@@ -589,6 +613,278 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     }
   }
 
+  Future<void> _handleAdditionalGuestPayment() async {
+    final currentTotalGuests = spouseCount + childCount;
+    final originalTotalGuests = originalSpouseCount + originalChildCount;
+    final additionalGuests = currentTotalGuests - originalTotalGuests;
+
+    // Calculate additional payment
+    final additionalGuestFee = additionalGuests * 500; // 500 per guest
+    final transactionFee = (additionalGuestFee * 0.025).round();
+    final totalAdditionalAmount = additionalGuestFee + transactionFee;
+
+    // Show payment confirmation dialog
+    final shouldProceed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text(
+          'অতিরিক্ত পেমেন্ট প্রয়োজন',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2196F3),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('অতিরিক্ত অতিথি: $additionalGuests জন'),
+            Text('অতিথি ফি: ৳$additionalGuestFee'),
+            Text('লেনদেন ফি (২.৫%): ৳$transactionFee'),
+            const Divider(),
+            Text(
+              'মোট অতিরিক্ত: ৳$totalAdditionalAmount',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFD4AF37),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'এই পরিমাণ পেমেন্ট করার পর অতিথি সংখ্যা আপডেট হবে।',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('বাতিল'),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2196F3),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('পেমেন্ট করুন'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true) {
+      return;
+    }
+
+    // Launch SSL Commerz payment
+    await _launchAdditionalGuestPayment(totalAdditionalAmount);
+  }
+
+  Future<void> _launchAdditionalGuestPayment(int amount) async {
+    try {
+      setState(() => isLoading = true);
+
+      // Create payment request for additional guests
+      final paymentRequest = PaymentRequest(
+        transactionId: 'ADD_GUEST_${DateTime.now().millisecondsSinceEpoch}',
+        amount: amount.toDouble(),
+        customerName: nameController.text.trim(),
+        customerEmail: emailController.text.trim(),
+        customerPhone: mobileController.text.trim(),
+        customerAddress: presentAddressController.text.trim(),
+        productName:
+            'অতিরিক্ত অতিথি ফি - ${(spouseCount + childCount) - (originalSpouseCount + originalChildCount)} জন',
+        additionalData: {
+          'registrationId': widget.phone,
+          'newSpouseCount': spouseCount.toString(),
+          'newChildCount': childCount.toString(),
+          'originalSpouseCount': originalSpouseCount.toString(),
+          'originalChildCount': originalChildCount.toString(),
+          'additionalGuests':
+              ((spouseCount + childCount) -
+                      (originalSpouseCount + originalChildCount))
+                  .toString(),
+          'type': 'additional_guest_payment',
+        },
+      );
+
+      // Launch payment
+      await SSLCommerzService.launchPayment(
+        context: context,
+        request: paymentRequest,
+        onSuccess: (paymentData) async {
+          debugPrint('Additional guest payment successful: $paymentData');
+
+          // Show success dialog
+          SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+
+          // Update registration with new guest count
+          await _updateRegistrationAfterPayment(paymentData);
+        },
+        onFailure: (error) {
+          debugPrint('Additional guest payment failed: $error');
+          SSLCommerzService.showPaymentFailureDialog(context, error);
+          setState(() => isLoading = false);
+        },
+        onCancel: (error) {
+          debugPrint('Additional guest payment cancelled');
+          Get.snackbar(
+            'বাতিল',
+            'পেমেন্ট বাতিল করা হয়েছে',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          setState(() => isLoading = false);
+        },
+      );
+    } catch (error) {
+      debugPrint('Error launching additional guest payment: $error');
+      Get.snackbar(
+        'ত্রুটি',
+        'পেমেন্ট শুরু করতে সমস্যা হয়েছে',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _updateRegistrationAfterPayment(
+    Map<String, dynamic> paymentData,
+  ) async {
+    try {
+      final additionalGuests =
+          (spouseCount + childCount) -
+          (originalSpouseCount + originalChildCount);
+      final additionalGuestFee = additionalGuests * 500;
+      final transactionFee = (additionalGuestFee * 0.025).round();
+
+      // Get original total payable amount
+      final int originalTotalPayable =
+          widget.registrationData['totalPayable'] ?? 0;
+
+      // Handle photo upload if new photo selected
+      String? photoUrl = currentPhotoUrl;
+      if (selectedPhoto != null) {
+        try {
+          photoUrl = await _uploadPhoto(File(''));
+          if (photoUrl == null) {
+            setState(() => isLoading = false);
+            Get.snackbar(
+              'ত্রুটি',
+              'ছবি আপলোড ব্যর্থ হয়েছে',
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+            );
+            return;
+          }
+        } catch (e) {
+          print('Photo upload error: $e');
+          setState(() => isLoading = false);
+          Get.snackbar(
+            'ত্রুটি',
+            'ছবি আপলোডে সমস্যা: $e',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
+
+      final data = {
+        'name': nameController.text.trim(),
+        'fatherName': fatherNameController.text.trim(),
+        'motherName': motherNameController.text.trim(),
+        'mobile': mobileController.text.trim(),
+        'email': emailController.text.trim(),
+        'occupation': occupationController.text.trim(),
+        'designation': designationController.text.trim(),
+        'permanentAddress': permanentAddressController.text.trim(),
+        'presentAddress': presentAddressController.text.trim(),
+        'workplaceAddress': workplaceAddressController.text.trim(),
+        'nationalId': nationalIdController.text.trim(),
+        'gender': gender,
+        'nationality': nationality,
+        'religion': religion,
+        'bloodGroup': bloodGroup,
+        'tshirtSize': tshirtSize,
+        'spouseCount': spouseCount,
+        'childCount': childCount,
+        'guestNames': guestNames,
+        'guestRelationships': guestRelationships,
+        'sscPassingYear': sscPassingYear,
+        'finalClass': finalClass,
+        'year': year,
+        'isRunningStudent': isRunningStudent,
+        'isStillStudying': isStillStudying,
+        'batch': widget.batchId,
+        'totalPayable':
+            originalTotalPayable + additionalGuestFee + transactionFee,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'additionalPayments': FieldValue.arrayUnion([
+          {
+            'type': 'additional_guest_payment',
+            'additionalGuests': additionalGuests,
+            'additionalGuestFee': additionalGuestFee,
+            'transactionFee': transactionFee,
+            'totalAmount': additionalGuestFee + transactionFee,
+            'paymentData': paymentData,
+            'paymentTimestamp': FieldValue.serverTimestamp(),
+          },
+        ]),
+        'updateHistory': FieldValue.arrayUnion([
+          {
+            'type': 'guest_count_increase_with_payment',
+            'oldSpouseCount': originalSpouseCount,
+            'newSpouseCount': spouseCount,
+            'oldChildCount': originalChildCount,
+            'newChildCount': childCount,
+            'additionalPayment': additionalGuestFee + transactionFee,
+            'timestamp': FieldValue.serverTimestamp(),
+            'paymentStatus': 'approved',
+          },
+        ]),
+      };
+
+      if (photoUrl != null) {
+        data['photoUrl'] = photoUrl;
+      }
+
+      print('Updating registration with data: $data');
+
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(widget.batchId)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(widget.phone)
+          .update(data);
+
+      print('Registration updated successfully');
+      setState(() => isLoading = false);
+
+      Get.snackbar(
+        'সফল',
+        'অতিথি সংখ্যা এবং পেমেন্ট আপডেট করা হয়েছে',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      // Navigate back with success result
+      Get.back(result: true);
+    } catch (e) {
+      print('Error updating registration after payment: $e');
+      setState(() => isLoading = false);
+      Get.snackbar(
+        'ত্রুটি',
+        'তথ্য আপডেট ব্যর্থ: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   Future<void> _deleteRegistration() async {
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
@@ -675,7 +971,10 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         actions: [
           // Delete button
           IconButton(
-            onPressed: isDeleting ? null : _deleteRegistration,
+            onPressed:
+                (isDeleting || paymentStatus == 'approved')
+                    ? null
+                    : _deleteRegistration,
             icon:
                 isDeleting
                     ? const SizedBox(
@@ -686,8 +985,17 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                    : const Icon(Icons.delete_forever, color: Colors.white),
-            tooltip: 'নিবন্ধন মুছে ফেলুন',
+                    : Icon(
+                      Icons.delete_forever,
+                      color:
+                          paymentStatus == 'approved'
+                              ? Colors.grey
+                              : Colors.white,
+                    ),
+            tooltip:
+                paymentStatus == 'approved'
+                    ? 'পেমেন্ট অনুমোদিত হওয়ার পর নিবন্ধন মুছে ফেলা যাবে না'
+                    : 'নিবন্ধন মুছে ফেলুন',
           ),
         ],
       ),
@@ -1005,6 +1313,38 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
 
                 // Guest Information Section
                 _sectionCard('অতিথির তথ্য', Icons.people, [
+                  // Payment status warning
+                  if (paymentStatus == 'approved') ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_outlined,
+                            color: Colors.orange[700],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'পেমেন্ট অনুমোদিত হওয়ার পর অতিথি সংখ্যা কেবল বৃদ্ধি করা যাবে। অতিরিক্ত অতিথির জন্য অতিরিক্ত পেমেন্ট প্রয়োজন হবে।',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -1012,6 +1352,10 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                           label: 'স্বামী/স্ত্রী/সন্তান',
                           value: spouseCount,
                           maxValue: 3,
+                          minValue:
+                              paymentStatus == 'approved'
+                                  ? originalSpouseCount
+                                  : 0,
                           onChanged: (value) {
                             final newTotal = value + childCount;
                             if (newTotal <= 3) {
@@ -1039,6 +1383,10 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                           label: 'অন্যান্য আতিথী',
                           value: childCount,
                           maxValue: 3,
+                          minValue:
+                              paymentStatus == 'approved'
+                                  ? originalChildCount
+                                  : 0,
                           onChanged: (value) {
                             final newTotal = spouseCount + value;
                             if (newTotal <= 3) {
@@ -1312,7 +1660,10 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                     // Delete Button
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: isDeleting ? null : _deleteRegistration,
+                        onPressed:
+                            (isDeleting || paymentStatus == 'approved')
+                                ? null
+                                : _deleteRegistration,
                         icon:
                             isDeleting
                                 ? const SizedBox(
@@ -1327,10 +1678,17 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                                 )
                                 : const Icon(Icons.delete_forever),
                         label: Text(
-                          isDeleting ? 'মুছে ফেলছি...' : 'নিবন্ধন মুছে ফেলুন',
+                          isDeleting
+                              ? 'মুছে ফেলছি...'
+                              : paymentStatus == 'approved'
+                              ? 'মুছে ফেলা যাবে না'
+                              : 'নিবন্ধন মুছে ফেলুন',
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor:
+                              paymentStatus == 'approved'
+                                  ? Colors.grey
+                                  : Colors.red,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
@@ -1479,6 +1837,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     required int value,
     required void Function(int) onChanged,
     int? maxValue,
+    int? minValue,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1495,9 +1854,13 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         Row(
           children: [
             IconButton(
-              onPressed: value > 0 ? () => onChanged(value - 1) : null,
+              onPressed:
+                  value > (minValue ?? 0) ? () => onChanged(value - 1) : null,
               icon: const Icon(Icons.remove_circle_outline),
-              color: const Color(0xFFD4AF37),
+              color:
+                  value > (minValue ?? 0)
+                      ? const Color(0xFFD4AF37)
+                      : Colors.grey,
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
