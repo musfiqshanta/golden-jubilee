@@ -146,6 +146,20 @@ app.use('/api/sslcommerz/validate', createProxyMiddleware({
   }
 }));
 
+// EMI API endpoint proxy
+app.use('/api/sslcommerz/emi', createProxyMiddleware({
+  target: 'https://sandbox.sslcommerz.com',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/sslcommerz/emi': '/securepay/api.php/get_emi', // Map to EMI endpoint
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('💳 Proxying EMI request');
+    console.log('Method:', req.method);
+    console.log('Content-Type:', req.headers['content-type']);
+  }
+}));
+
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);
 });

@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:suborno_joyonti/services/sslcommerz_service.dart';
+import 'package:suborno_joyonti/app/modules/registration/views/check_registration_page.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
@@ -717,10 +718,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         onSuccess: (paymentData) async {
           debugPrint('Additional guest payment successful: $paymentData');
 
-          // Show success dialog
-          SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
-
-          // Update registration with new guest count
+          // Update registration with new guest count first
           await _updateRegistrationAfterPayment(paymentData);
         },
         onFailure: (error) {
@@ -831,7 +829,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             'transactionFee': transactionFee,
             'totalAmount': additionalGuestFee + transactionFee,
             'paymentData': paymentData,
-            'paymentTimestamp': FieldValue.serverTimestamp(),
+            'paymentTimestamp': DateTime.now().toIso8601String(),
           },
         ]),
         'updateHistory': FieldValue.arrayUnion([
@@ -842,7 +840,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             'oldChildCount': originalChildCount,
             'newChildCount': childCount,
             'additionalPayment': additionalGuestFee + transactionFee,
-            'timestamp': FieldValue.serverTimestamp(),
+            'timestamp': DateTime.now().toIso8601String(),
             'paymentStatus': 'approved',
           },
         ]),
@@ -864,15 +862,30 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       print('Registration updated successfully');
       setState(() => isLoading = false);
 
+      // Show success dialog after data is updated
+      SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+
       Get.snackbar(
         'সফল',
         'অতিথি সংখ্যা এবং পেমেন্ট আপডেট করা হয়েছে',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
 
-      // Navigate back with success result
-      Get.back(result: true);
+      // Show a brief message about the navigation
+      Get.snackbar(
+        'সফল',
+        'অতিথি সংখ্যা আপডেট করা হয়েছে। নিবন্ধন তথ্য দেখুন।',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      // Navigate to check registration page after a short delay
+      Future.delayed(const Duration(seconds: 1), () {
+        Get.offAll(() => CheckRegistrationPage());
+      });
     } catch (e) {
       print('Error updating registration after payment: $e');
       setState(() => isLoading = false);

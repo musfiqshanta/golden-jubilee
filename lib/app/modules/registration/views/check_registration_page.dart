@@ -1033,10 +1033,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
         onSuccess: (paymentData) async {
           debugPrint('Payment successful: $paymentData');
 
-          // Show success dialog
-          SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
-
-          // Update registration with payment information
+          // Update registration with payment information first
           await _updateRegistrationAfterPayment(registration, paymentData);
         },
         onFailure: (errorData) {
@@ -1072,7 +1069,19 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     try {
       // Show loading
       Get.dialog(
-        const Center(child: CircularProgressIndicator()),
+        const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'পেমেন্ট তথ্য আপডেট করা হচ্ছে...',
+                style: TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
+        ),
         barrierDismissible: false,
       );
 
@@ -1096,19 +1105,27 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
       // Close loading dialog
       Get.back();
 
-      // Update local state
+      // Update local state and refresh UI
       setState(() {
         foundRegistration = updatedData;
       });
 
-      // Show success message
+      // Show success dialog after data is updated
+      SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+
+      // Also show success message
       Get.snackbar(
         'সফল',
         'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে এবং নিবন্ধন অনুমোদিত হয়েছে!',
         backgroundColor: Colors.green,
         colorText: Colors.white,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 3),
       );
+
+      // Refresh the search to show updated data
+      if (phoneController.text.isNotEmpty) {
+        _checkRegistration();
+      }
     } catch (error) {
       // Close loading dialog if still open
       if (Get.isDialogOpen ?? false) {

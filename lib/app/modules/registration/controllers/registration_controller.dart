@@ -587,9 +587,6 @@ class RegistrationController extends GetxController {
       onSuccess: (paymentData) async {
         debugPrint('Payment successful: $paymentData');
 
-        // Show success dialog
-        SSLCommerzService.showPaymentSuccessDialog(Get.context!, paymentData);
-
         // Submit form data after successful payment
         await _submitRegistrationAfterPayment(registrationData, paymentData);
       },
@@ -761,12 +758,15 @@ class RegistrationController extends GetxController {
       // Clear form
       clearForm();
 
+      // Show success dialog after data is saved
+      SSLCommerzService.showPaymentSuccessDialog(Get.context!, paymentData);
+
       Get.snackbar(
         'সফল',
         'নিবন্ধন সফলভাবে সম্পন্ন হয়েছে এবং পেমেন্ট গ্রহণ করা হয়েছে!',
         backgroundColor: Colors.green,
         colorText: Colors.white,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 3),
       );
     } catch (error) {
       Get.back(); // Dismiss loading on error

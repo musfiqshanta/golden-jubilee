@@ -99,6 +99,9 @@ class SSLCommerzConfig {
   /// Proxy endpoint for payment validation
   static const String proxyValidateEndpoint = "/api/sslcommerz/validate";
 
+  /// Proxy endpoint for EMI API
+  static const String proxyEmiEndpoint = "/api/sslcommerz/emi";
+
   /// Whether to use proxy server (recommended for web deployment)
   static bool get useProxy => true;
 
@@ -124,6 +127,16 @@ class SSLCommerzConfig {
     return isSandbox
         ? 'https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php'
         : 'https://securepay.sslcommerz.com/validator/api/validationserverAPI.php';
+  }
+
+  /// Get the EMI API URL based on environment and proxy settings
+  static String get emiApiUrl {
+    if (useProxy) {
+      return '$proxyServerUrl$proxyEmiEndpoint';
+    }
+    return isSandbox
+        ? 'https://sandbox.sslcommerz.com/securepay/api.php/get_emi'
+        : 'https://securepay.sslcommerz.com/securepay/api.php/get_emi';
   }
 
   // ============================================================================
