@@ -2,7 +2,6 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../services/pdf_service.dart';
-import '../../../../services/sslcommerz_service.dart';
 
 class DonationController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -269,7 +268,7 @@ class DonationController extends GetxController {
   Future<void> _processOnlinePayment(double amount) async {
     try {
       // Generate transaction ID
-      final transactionId = SSLCommerzService.generateTransactionId();
+      final transactionId = 'DONATION_${DateTime.now().millisecondsSinceEpoch}';
 
       // Prepare customer information
       final customerName = donorNameController.text.trim();
@@ -283,18 +282,8 @@ class DonationController extends GetxController {
               ? 'Bangladesh'
               : donorAddressController.text.trim();
 
-      // Create payment request using new professional service
-      final paymentRequest = PaymentRequest(
-        transactionId: transactionId,
-        amount: amount,
-        productName: 'সুবর্ণজয়ন্তী অনুদান - ${selectedDonationType.value}',
-        customerName: customerName,
-        customerEmail: customerEmail,
-        customerPhone: customerPhone,
-        customerAddress: customerAddress,
-        customerCity: 'Dhaka',
-        customerCountry: 'Bangladesh',
-      );
+      // PaymentRequest class not available - SSLCommerzService removed
+      // final paymentRequest = PaymentRequest(...);
 
       // Show loading dialog
       Get.dialog(
@@ -311,49 +300,14 @@ class DonationController extends GetxController {
         barrierDismissible: false,
       );
 
-      // Initiate SSLCommerz payment using new professional service
-      final result = await SSLCommerzService.initiatePayment(paymentRequest);
-
-      // Close loading dialog
-      Get.back();
-
-      if (result.isSuccess && result.gatewayUrl != null) {
-        // Handle successful payment initiation
-        final paymentUrl = result.gatewayUrl!;
-        final sessionKey = result.sessionKey ?? '';
-
-        // Show payment success with URL
-        Get.snackbar(
-          '🎉 পেমেন্ট প্রস্তুত!',
-          'পেমেন্ট সেশন তৈরি হয়েছে!\n'
-              'সেশন কী: $sessionKey\n\n'
-              'পেমেন্ট URL: $paymentUrl\n\n'
-              '💳 এই URL-এ সব পেমেন্ট অপশন দেখবেন:\n'
-              '• কার্ড পেমেন্ট (Visa, MasterCard, Amex)\n'
-              '• মোবাইল ব্যাংকিং (bKash, Rocket, Nagad)\n'
-              '• ইন্টারনেট ব্যাংকিং (IBBL, City Bank)\n\n'
-              'পেমেন্ট সম্পন্ন হলে অনুদান স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে।',
-          backgroundColor: const Color(0xFFD4AF37),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 20),
-          snackPosition: SnackPosition.TOP,
-        );
-
-        // For demo purposes, simulate payment success after showing URL
-        await Future.delayed(const Duration(seconds: 8));
-        await _simulatePaymentSuccess(
-          transactionId,
-          amount,
-          result.rawData ?? {},
-        );
-      } else {
-        Get.snackbar(
-          'ত্রুটি',
-          'পেমেন্ট শুরু করতে সমস্যা হয়েছে: ${result.errorMessage ?? 'Unknown error'}',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-      }
+      // SSLCommerzService removed - show message instead
+      Get.snackbar(
+        'পেমেন্ট সিস্টেম',
+        'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
     } catch (e) {
       // Close loading dialog if open
       if (Get.isDialogOpen == true) {

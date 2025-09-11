@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:suborno_joyonti/main.dart';
+import 'package:suborno_joyonti/main2.dart';
 
 void main() {
   testWidgets('Golden Jubilee App instantiation test', (

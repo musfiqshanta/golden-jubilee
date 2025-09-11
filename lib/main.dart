@@ -1,5 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:html' as html;
 
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,11 +31,30 @@ import 'admin_panel/screens/search_user_screen.dart';
 import 'admin_panel/screens/countdown_settings_screen.dart';
 import 'services/countdown_service.dart';
 import 'admin_panel/services/counter_service.dart';
+import 'services/env_service.dart';
+import 'services/sslcommerz_config.dart';
+import 'test_payment_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set environment - change this to Environment.development for testing
+  // Initialize environment variables
+  await EnvService.initialize();
+
+  // Debug: Print environment status
+  print('🔐 Environment Status:');
+  final envStatus = EnvService.getEnvironmentStatus();
+  envStatus.forEach((key, value) {
+    print('   $key: $value');
+  });
+
+  // Additional debug info
+  print('🔧 SSLCommerz Configuration:');
+  print('   Store ID: ${SSLCommerzConfig.storeId}');
+  print('   Is Sandbox: ${SSLCommerzConfig.isSandbox}');
+  print('   Environment File Loaded: ${EnvService.isEnvFileLoaded}');
+
+  // Set environment - DEVELOPMENT MODE
   CollectionConfig.setEnvironment(Environment.development);
 
   // Initialize Firebase (same project, different collections)
@@ -70,6 +91,7 @@ class GoldenJubileeApp extends StatelessWidget {
           ),
           useMaterial3: true,
           fontFamily: GoogleFonts.montserrat().fontFamily,
+
           textTheme: GoogleFonts.montserratTextTheme(),
         ),
         initialBinding: RegistrationBinding(),
@@ -228,6 +250,11 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
 
     // Load statistics once when page loads
     _loadStatistics();
+
+    // Check for payment callbacks (web only)
+    if (kIsWeb) {
+      _checkPaymentCallback();
+    }
   }
 
   // Load statistics data once
@@ -253,9 +280,73 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     }
   }
 
-  // Professional payment integration using SSLCommerzService
+  // Professional payment integration - Navigate to GetX-based test page
   Future<void> _launchTestPayment() async {
-    await PaymentHelper.launchTestPayment(context, amount: 100.0);
+    // Navigate to the test payment page
+    Get.to(() => const PaymentPage());
+  }
+
+  // Check for payment callbacks from SSLCommerz
+  void _checkPaymentCallback() {
+    if (kIsWeb) {
+      final uri = Uri.parse(html.window.location.href);
+      final paymentStatus = uri.queryParameters['payment'];
+
+      if (paymentStatus != null) {
+        // Extract payment data from URL parameters
+        final paymentData = <String, dynamic>{};
+        uri.queryParameters.forEach((key, value) {
+          if (key != 'payment') {
+            paymentData[key] = value;
+          }
+        });
+
+        // Show appropriate dialog based on payment status
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          switch (paymentStatus) {
+            case 'success':
+              // SSLCommerzService dialog removed
+              Get.snackbar(
+                'পেমেন্ট সফল',
+                'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে!',
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+              );
+              break;
+            case 'failed':
+              // SSLCommerzService dialog removed
+              Get.snackbar(
+                'পেমেন্ট ব্যর্থ',
+                'পেমেন্ট ব্যর্থ হয়েছে।',
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
+              break;
+            case 'cancelled':
+              Get.snackbar(
+                'পেমেন্ট বাতিল',
+                'আপনি পেমেন্ট বাতিল করেছেন।',
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 3),
+              );
+              break;
+          }
+        });
+
+        // Clean up URL by removing payment parameters
+        _cleanUrl();
+      }
+    }
+  }
+
+  // Clean URL by removing payment parameters
+  void _cleanUrl() {
+    if (kIsWeb) {
+      final uri = Uri.parse(html.window.location.href);
+      final cleanUri = uri.replace(queryParameters: {});
+      html.window.history.replaceState(null, '', cleanUri.toString());
+    }
   }
 
   @override
@@ -292,6 +383,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     );
   }
 
+  final sslConfig = Get.put(SSLCommerzConfig());
   Widget _buildHeroSection() {
     final days = _registrationCountdown.inDays;
     final hours = _registrationCountdown.inHours % 24;
@@ -392,7 +484,15 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: ElevatedButton(
-                          onPressed: () => _launchTestPayment(),
+                          onPressed:
+                              () => sslConfig.makePaymentRequest(
+                                amount: '100',
+                                customerName: 'Test User',
+                                customerEmail: 'test@example.com',
+                                customerPhone: '01234567890',
+                                customerAddress: 'Test Address',
+                                productName: 'Test Payment',
+                              ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
                             foregroundColor: Colors.white,

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test Registration Payment Debug</title>
+    </head>
+    <body>
+        <h1>Test Registration Payment Debug</h1>
+        <button onclick="testRegistrationPayment()">Test Registration Payment</button>
+        <div id="result"></div>
+        <script>
+        async function testRegistrationPayment() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing registration payment...';
+            
+            try {
+                // Test data similar to what registration would send
+                const testData = {
+                    store_id: 'teamx68b12058b6036',
+                    store_passwd: 'teamx68b12058b6036@ssl',
+                    total_amount: '1000',
+                    currency: 'BDT',
+                    tran_id: 'TXN_' + Date.now(),
+                    success_url: 'https://jubilee.jahajmarahighschool.com/payment/success',
+                    fail_url: 'https://jubilee.jahajmarahighschool.com/payment/fail',
+                    cancel_url: 'https://jubilee.jahajmarahighschool.com/payment/cancel',
+                    cus_name: 'Test User',
+                    cus_email: 'test@example.com',
+                    cus_add1: 'Test Address',
+                    cus_add2: 'নোয়াখালী',
+                    cus_city: 'নোয়াখালী',
+                    cus_state: 'নোয়াখালী',
+                    cus_postcode: '3800',
+                    cus_country: 'Bangladesh',
+                    cus_phone: '01711111111',
+                    cus_fax: '01711111111',
+                    ship_name: 'Test User',
+                    ship_add1: 'Test Address',
+                    ship_add2: 'নোয়াখালী',
+                    ship_city: 'নোয়াখালী',
+                    ship_state: 'নোয়াখালী',
+                    ship_postcode: '3800',
+                    ship_country: 'Bangladesh',
+                    product_name: 'জাহাজমারা উচ্চ বিদ্যালয় সুবর্ণজয়ন্তী - রেজিস্ট্রেশন ফি',
+                    product_category: 'donation',
+                    product_profile: 'general',
+                    num_of_item: '1',
+                    product_amount: '1000',
+                    multi_card_name: 'mastercard,visacard,amexcard',
+                    shipping_method: 'YES',
+                    emi_option: '0',
+                    emi_max_inst_option: '0',
+                    emi_selected_inst: '0',
+                    emi_allow_only: '0',
+                    value_a: 'donation_TXN_' + Date.now(),
+                    value_b: '01711111111',
+                    value_c: 'জাহাজমারা উচ্চ বিদ্যালয় সুবর্ণজয়ন্তী - রেজিস্ট্রেশন ফি'
+                };
+
+                console.log('Sending test data:', testData);
+
+                const response = await fetch('https://jubilee.jahajmarahighschool.com/payment_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(testData)
+                });
+
+                console.log('Response status:', response.status);
+                const responseText = await response.text();
+                console.log('Response body:', responseText);
+
+                if (response.ok) {
+                    const data = JSON.parse(responseText);
+                    if (data.GatewayPageURL) {
+                        resultDiv.innerHTML = `
+                            <h3>✅ Success!</h3>
+                            <p>Gateway URL: <a href="${data.GatewayPageURL}" target="_blank">${data.GatewayPageURL}</a></p>
+                            <p>Status: ${data.status}</p>
+                            <p>Session Key: ${data.sessionkey}</p>
+                        `;
+                        // Open payment page
+                        window.open(data.GatewayPageURL, '_blank');
+                    } else {
+                        resultDiv.innerHTML = `
+                            <h3>❌ Error</h3>
+                            <p>Status: ${data.status}</p>
+                            <p>Error: ${data.failedreason}</p>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3>❌ HTTP Error</h3>
+                        <p>Status: ${response.status}</p>
+                        <p>Response: ${responseText}</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+        </script>
+    </body>
+</html>

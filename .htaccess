@@ -1,0 +1,133 @@
+# ============================================================================
+# HOSTINGER CORS CONFIGURATION
+# ============================================================================
+# This file handles CORS headers for your Flutter web app on Hostinger
+# Upload this file to your website root directory
+
+# Enable CORS for all origins (adjust as needed for security)
+<IfModule mod_headers.c>
+    # Allow all origins (you can restrict this to your domain)
+    Header always set Access-Control-Allow-Origin "*"
+    
+    # Allow common HTTP methods
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    
+    # Allow common headers
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+    
+    # Allow credentials (if needed)
+    Header always set Access-Control-Allow-Credentials "true"
+    
+    # Expose headers to client
+    Header always set Access-Control-Expose-Headers "Content-Length, X-Foo, X-Bar"
+    
+    # Handle preflight OPTIONS requests
+    Header always set Access-Control-Max-Age "86400"
+</IfModule>
+
+# Handle preflight OPTIONS requests
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# ============================================================================
+# FLUTTER WEB APP CONFIGURATION
+# ============================================================================
+
+# Enable compression for better performance
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# Set proper MIME types for Flutter web assets
+<IfModule mod_mime.c>
+    AddType application/javascript .js
+    AddType application/json .json
+    AddType application/wasm .wasm
+    AddType text/css .css
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType image/svg+xml .svg
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType font/ttf .ttf
+    AddType font/otf .otf
+</IfModule>
+
+# Cache static assets for better performance
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/json "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType font/otf "access plus 1 year"
+    ExpiresByType application/wasm "access plus 1 year"
+</IfModule>
+
+# ============================================================================
+# SECURITY HEADERS
+# ============================================================================
+
+# Prevent clickjacking
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ============================================================================
+# FLUTTER WEB ROUTING
+# ============================================================================
+
+# Handle Flutter web routing (SPA routing)
+RewriteEngine On
+
+# Don't rewrite files that exist
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Don't rewrite API calls or payment handler
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/payment_handler\.php
+
+# Rewrite everything else to index.html for Flutter web routing
+RewriteRule ^(.*)$ /index.html [QSA,L]
+
+# ============================================================================
+# PHP CONFIGURATION
+# ============================================================================
+
+# Ensure PHP files are processed correctly
+<Files "*.php">
+    SetHandler application/x-httpd-php
+</Files>
+
+# Set PHP memory limit (adjust as needed)
+php_value memory_limit 256M
+
+# Set PHP execution time limit
+php_value max_execution_time 300
+
+# ============================================================================
+# ERROR PAGES
+# ============================================================================
+
+# Custom error pages (optional)
+ErrorDocument 404 /index.html
+ErrorDocument 500 /index.html

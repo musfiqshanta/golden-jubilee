@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Test Payment Handler</title>
+        <meta charset="UTF-8">
+    </head>
+    <body>
+        <h2>Test Payment Handler</h2>
+        <p>This form will test the payment handler with sample data:</p>
+        <form method="POST" action="https://jubilee.jahajmarahighschool.com/payment_handler.php">
+            <input type="hidden" name="store_id" value="teamx68b12058b6036">
+            <input type="hidden" name="store_passwd" value="teamx68b12058b6036@ssl">
+            <input type="hidden" name="total_amount" value="100.00">
+            <input type="hidden" name="tran_id" value="TEST_123456789">
+            <input type="hidden" name="currency" value="BDT">
+            <input type="hidden" name="cus_name" value="Test User">
+            <input type="hidden" name="cus_email" value="test@example.com">
+            <input type="hidden" name="cus_phone" value="01700000000">
+            <input type="hidden" name="cus_add1" value="Test Address">
+            <input type="hidden" name="cus_city" value="Dhaka">
+            <input type="hidden" name="cus_state" value="Dhaka">
+            <input type="hidden" name="cus_postcode" value="1000">
+            <input type="hidden" name="cus_country" value="Bangladesh">
+            <input type="hidden" name="ship_name" value="Test User">
+            <input type="hidden" name="ship_add1" value="Test Address">
+            <input type="hidden" name="ship_city" value="Dhaka">
+            <input type="hidden" name="ship_state" value="Dhaka">
+            <input type="hidden" name="ship_postcode" value="1000">
+            <input type="hidden" name="ship_country" value="Bangladesh">
+            <input type="hidden" name="product_name" value="Test Donation">
+            <input type="hidden" name="product_category" value="Donation">
+            <input type="hidden" name="product_profile" value="general">
+            <input type="hidden" name="success_url" value="https://jubilee.jahajmarahighschool.com/payment_handler.php/payment/success">
+            <input type="hidden" name="fail_url" value="https://jubilee.jahajmarahighschool.com/payment_handler.php/payment/fail">
+            <input type="hidden" name="cancel_url" value="https://jubilee.jahajmarahighschool.com/payment_handler.php/payment/cancel">
+            <input type="hidden" name="emi_option" value="0">
+            <input type="hidden" name="emi_max_inst_option" value="0">
+            <input type="hidden" name="emi_selected_inst" value="0">
+            <input type="hidden" name="emi_allow_only" value="0">
+            <input type="hidden" name="shipping_method" value="NO">
+            <input type="hidden" name="value_a" value="donation_TEST_123456789">
+            <input type="hidden" name="value_b" value="01700000000">
+            <input type="hidden" name="value_c" value="Test Donation">
+            <button type="submit">Test Payment Handler</button>
+        </form>
+    </body>
+</html>

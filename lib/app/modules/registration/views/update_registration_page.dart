@@ -8,7 +8,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:suborno_joyonti/services/sslcommerz_service.dart';
 import 'package:suborno_joyonti/app/modules/registration/views/check_registration_page.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
@@ -688,55 +687,17 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       setState(() => isLoading = true);
 
       // Create payment request for additional guests
-      final paymentRequest = PaymentRequest(
-        transactionId: 'ADD_GUEST_${DateTime.now().millisecondsSinceEpoch}',
-        amount: amount.toDouble(),
-        customerName: nameController.text.trim(),
-        customerEmail: emailController.text.trim(),
-        customerPhone: mobileController.text.trim(),
-        customerAddress: presentAddressController.text.trim(),
-        productName:
-            'অতিরিক্ত অতিথি ফি - ${(spouseCount + childCount) - (originalSpouseCount + originalChildCount)} জন',
-        additionalData: {
-          'registrationId': widget.phone,
-          'newSpouseCount': spouseCount.toString(),
-          'newChildCount': childCount.toString(),
-          'originalSpouseCount': originalSpouseCount.toString(),
-          'originalChildCount': originalChildCount.toString(),
-          'additionalGuests':
-              ((spouseCount + childCount) -
-                      (originalSpouseCount + originalChildCount))
-                  .toString(),
-          'type': 'additional_guest_payment',
-        },
-      );
+      // PaymentRequest class not available - SSLCommerzService removed
+      // final paymentRequest = PaymentRequest(...);
 
-      // Launch payment
-      await SSLCommerzService.launchPayment(
-        context: context,
-        request: paymentRequest,
-        onSuccess: (paymentData) async {
-          debugPrint('Additional guest payment successful: $paymentData');
-
-          // Update registration with new guest count first
-          await _updateRegistrationAfterPayment(paymentData);
-        },
-        onFailure: (error) {
-          debugPrint('Additional guest payment failed: $error');
-          SSLCommerzService.showPaymentFailureDialog(context, error);
-          setState(() => isLoading = false);
-        },
-        onCancel: (error) {
-          debugPrint('Additional guest payment cancelled');
-          Get.snackbar(
-            'বাতিল',
-            'পেমেন্ট বাতিল করা হয়েছে',
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-          );
-          setState(() => isLoading = false);
-        },
+      // SSLCommerzService removed - show message instead
+      Get.snackbar(
+        'পেমেন্ট সিস্টেম',
+        'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
       );
+      setState(() => isLoading = false);
     } catch (error) {
       debugPrint('Error launching additional guest payment: $error');
       Get.snackbar(
@@ -863,7 +824,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       setState(() => isLoading = false);
 
       // Show success dialog after data is updated
-      SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+      // SSLCommerzService dialog removed
 
       Get.snackbar(
         'সফল',

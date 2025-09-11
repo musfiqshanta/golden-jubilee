@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/registration_controller.dart';
+import '../../../../config/collection_names.dart';
 
 class RegistrationPage extends GetView<RegistrationController> {
   const RegistrationPage({super.key});
@@ -59,29 +60,30 @@ class RegistrationPage extends GetView<RegistrationController> {
                         //   onPressed: controller.generateAndOpenInvoice,
                         // ),
                         //razuiqbal1996@gmail.com
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.auto_fix_high, size: 18),
-                            label: const Text(
-                              'ডেমো ডাটা পূরণ করুন',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueGrey.shade100,
-                              foregroundColor: Colors.black87,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                        if (CollectionConfig.isDevelopment)
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.auto_fix_high, size: 18),
+                              label: const Text(
+                                'ডেমো ডাটা পূরণ করুন',
+                                style: TextStyle(fontSize: 12),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueGrey.shade100,
+                                foregroundColor: Colors.black87,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
                               ),
-                              elevation: 0,
+                              onPressed: controller.fillDemoData,
                             ),
-                            onPressed: controller.fillDemoData,
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1004,57 +1006,97 @@ class RegistrationPage extends GetView<RegistrationController> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                // Alternative Submit Button (for testing without payment)
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      if (controller.formKey.currentState!.validate() &&
-                          controller.selectedTshirtSize.value != null &&
-                          controller.selectedPhoto.value != null) {
-                        await controller.saveRegistration();
-                      } else if (controller.selectedTshirtSize.value == null) {
-                        Get.snackbar(
-                          'ত্রুটি',
-                          'টি-শার্ট সাইজ নির্বাচন করুন',
-                          backgroundColor: Colors.redAccent,
-                          colorText: Colors.white,
-                        );
-                      } else if (controller.selectedPhoto.value == null) {
-                        controller.photoError.value =
-                            'ছবি আপলোড করা বাধ্যতামূলক';
-                        Get.snackbar(
-                          'ত্রুটি',
-                          'ছবি আপলোড করা বাধ্যতামূলক',
-                          backgroundColor: Colors.redAccent,
-                          colorText: Colors.white,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.save, size: 20),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFD4AF37),
-                      side: const BorderSide(
-                        color: Color(0xFFD4AF37),
-                        width: 2,
+                // Alternative Submit Button (for testing without payment) - only show in development mode
+                if (CollectionConfig.isDevelopment)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (controller.formKey.currentState!.validate() &&
+                            controller.selectedTshirtSize.value != null &&
+                            controller.selectedPhoto.value != null) {
+                          await controller.saveRegistration();
+                        } else if (controller.selectedTshirtSize.value ==
+                            null) {
+                          Get.snackbar(
+                            'ত্রুটি',
+                            'টি-শার্ট সাইজ নির্বাচন করুন',
+                            backgroundColor: Colors.redAccent,
+                            colorText: Colors.white,
+                          );
+                        } else if (controller.selectedPhoto.value == null) {
+                          controller.photoError.value =
+                              'ছবি আপলোড করা বাধ্যতামূলক';
+                          Get.snackbar(
+                            'ত্রুটি',
+                            'ছবি আপলোড করা বাধ্যতামূলক',
+                            backgroundColor: Colors.redAccent,
+                            colorText: Colors.white,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.save, size: 20),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFD4AF37),
+                        side: const BorderSide(
+                          color: Color(0xFFD4AF37),
+                          width: 2,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 20,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 20,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    label: const Text(
-                      'নিবন্ধন জমা দিন (পেমেন্ট ছাড়া - টেস্টিং)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                      label: const Text(
+                        'নিবন্ধন জমা দিন (পেমেন্ট ছাড়া - টেস্টিং)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                const SizedBox(height: 10),
+                // Test Payment Success Dialog Button - only show in development mode
+                if (CollectionConfig.isDevelopment)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        debugPrint('🧪 Testing payment success dialog...');
+                        // Show the payment success dialog
+                        // SSLCommerzService dialog removed
+                        Get.snackbar(
+                          'টেস্ট পেমেন্ট',
+                          'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
+                          backgroundColor: Colors.orange,
+                          colorText: Colors.white,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 20,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.message, size: 20),
+                      label: const Text(
+                        'টেস্ট পেমেন্ট ডায়ালগ',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
 
                 const SizedBox(height: 20),
               ],

@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 import 'package:suborno_joyonti/app/modules/registration/views/update_registration_page.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
-import 'package:suborno_joyonti/services/sslcommerz_service.dart';
 
 class CheckRegistrationPage extends StatefulWidget {
   const CheckRegistrationPage({super.key});
@@ -1020,35 +1019,12 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
         totalAmount = baseAmount + transactionFee;
       }
 
-      // Create payment request using existing registration data
-      final paymentRequest = SSLCommerzService.createRegistrationPayment(
-        registrationData: registration,
-        amount: totalAmount.toDouble(),
-      );
-
-      // Launch payment
-      await SSLCommerzService.launchPayment(
-        context: context,
-        request: paymentRequest,
-        onSuccess: (paymentData) async {
-          debugPrint('Payment successful: $paymentData');
-
-          // Update registration with payment information first
-          await _updateRegistrationAfterPayment(registration, paymentData);
-        },
-        onFailure: (errorData) {
-          debugPrint('Payment failed: $errorData');
-          SSLCommerzService.showPaymentFailureDialog(context, errorData);
-        },
-        onCancel: (cancelData) {
-          debugPrint('Payment cancelled: $cancelData');
-          Get.snackbar(
-            'পেমেন্ট বাতিল',
-            'পেমেন্ট বাতিল করা হয়েছে',
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-          );
-        },
+      // SSLCommerzService removed - show message instead
+      Get.snackbar(
+        'পেমেন্ট সিস্টেম',
+        'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
       );
     } catch (e) {
       debugPrint('Payment initiation error: $e');
@@ -1111,7 +1087,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
       });
 
       // Show success dialog after data is updated
-      SSLCommerzService.showPaymentSuccessDialog(context, paymentData);
+      // SSLCommerzService dialog removed
 
       // Also show success message
       Get.snackbar(

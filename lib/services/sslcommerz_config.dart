@@ -1,196 +1,478 @@
+import 'dart:convert';
+import 'dart:async';
+import 'dart:html' as html;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
+import 'package:suborno_joyonti/app/modules/registration/controllers/registration_controller.dart';
+
+import '../services/env_service.dart';
+
 /// Professional SSLCommerz Configuration
 /// Handles all SSLCommerz payment gateway configuration and settings
-class SSLCommerzConfig {
+class SSLCommerzConfig extends GetxController {
   // ============================================================================
-  // STORE CREDENTIALS
+  // REACTIVE VARIABLES
+  // ============================================================================
+
+  /// Loading state
+  var isLoading = false.obs;
+
+  /// Payment status
+  var paymentStatus = ''.obs;
+
+  /// Transaction ID
+  var transactionId = ''.obs;
+
+  /// Payment URL
+  var paymentUrl = ''.obs;
+
+  /// Timer for polling
+  Timer? _pollingTimer;
+
+  // ============================================================================
+  // STATIC CONFIGURATION
   // ============================================================================
 
   /// SSLCommerz Store ID (Sandbox)
-  static const String storeId = "teamx68b12058b6036";
+  static String get storeId => EnvService.sslcommerzStoreId;
 
   /// SSLCommerz Store Password (Sandbox)
-  static const String storePassword = "teamx68b12058b6036@ssl";
-
-  // ============================================================================
-  // ENVIRONMENT CONFIGURATION
-  // ============================================================================
+  static String get storePassword => EnvService.sslcommerzStorePassword;
 
   /// Environment flag - set to false for production
-  static const bool isSandbox = true;
+  static bool get isSandbox => EnvService.sslcommerzIsSandbox;
 
   /// Currency code for transactions
   static const String currency = "BDT";
 
   // ============================================================================
-  // CALLBACK URLS
+  // LIFECYCLE METHODS
   // ============================================================================
 
-  /// Success callback URL - called when payment succeeds
-  static const String successUrl = "http://localhost:3001/payment/success";
-
-  /// Failure callback URL - called when payment fails
-  static const String failUrl = "http://localhost:3001/payment/fail";
-
-  /// Cancel callback URL - called when payment is cancelled
-  static const String cancelUrl = "http://localhost:3001/payment/cancel";
-
-  /// IPN (Instant Payment Notification) URL for server-to-server notifications
-  static const String ipnUrl = "http://localhost:3001/payment/ipn";
-
-  // ============================================================================
-  // STORE INFORMATION
-  // ============================================================================
-
-  /// Store display name
-  static const String storeName = "জাহাজমারা উচ্চ বিদ্যালয় সুবর্ণজয়ন্তী";
-
-  /// Store description
-  static const String storeDescription = "Golden Jubilee Celebration Donation";
-
-  /// Store logo URL
-  static const String storeLogo =
-      "https://jubilee.jahajmarahighschool.com/assets/logo.png";
-
-  // ============================================================================
-  // CONTACT INFORMATION
-  // ============================================================================
-
-  /// Store physical address
-  static const String storeAddress = "জাহাজমারা, হাতিয়া, নোয়াখালী";
-
-  /// Store city
-  static const String storeCity = "নোয়াখালী";
-
-  /// Store postal code
-  static const String storePostcode = "3800";
-
-  /// Store country
-  static const String storeCountry = "Bangladesh";
-
-  /// Store contact phone
-  static const String storePhone = "01767122407";
-
-  // ============================================================================
-  // PAYMENT SETTINGS
-  // ============================================================================
-
-  /// Default product category for donations
-  static const String productCategory = "donation";
-
-  /// EMI option (0 = disabled, 1 = enabled)
-  static const int emiOption = 0;
-
-  /// Supported payment methods
-  static const String supportedCards = "mastercard,visacard,amexcard";
-
-  /// Shipping method flag
-  static const String shippingMethod = "YES";
-
-  // ============================================================================
-  // PROXY SERVER CONFIGURATION (for CORS handling in web)
-  // ============================================================================
-
-  /// Local proxy server URL for handling CORS issues
-  static const String proxyServerUrl = "http://localhost:3001";
-
-  /// Proxy endpoint for payment initiation
-  static const String proxyInitiateEndpoint = "/api/sslcommerz/initiate";
-
-  /// Proxy endpoint for payment validation
-  static const String proxyValidateEndpoint = "/api/sslcommerz/validate";
-
-  /// Proxy endpoint for EMI API
-  static const String proxyEmiEndpoint = "/api/sslcommerz/emi";
-
-  /// Whether to use proxy server (recommended for web deployment)
-  static bool get useProxy => true;
-
-  // ============================================================================
-  // DYNAMIC URLS
-  // ============================================================================
-
-  /// Get the payment initiation URL based on environment and proxy settings
-  static String get paymentInitiateUrl {
-    if (useProxy) {
-      return '$proxyServerUrl$proxyInitiateEndpoint';
-    }
-    return isSandbox
-        ? 'https://sandbox.sslcommerz.com/gwprocess/v4/api.php'
-        : 'https://securepay.sslcommerz.com/gwprocess/v4/api.php';
+  @override
+  void onClose() {
+    _pollingTimer?.cancel();
+    super.onClose();
   }
 
-  /// Get the payment validation URL based on environment and proxy settings
-  static String get paymentValidateUrl {
-    if (useProxy) {
-      return '$proxyServerUrl$proxyValidateEndpoint';
+  // ============================================================================
+  // PAYMENT METHODS
+  // ============================================================================
+
+  /// Make payment request to SSLCommerz
+  Future<void> makePaymentRequest({
+    required String amount,
+    required String customerName,
+    required String customerEmail,
+    required String customerPhone,
+    required String customerAddress,
+    String? productName,
+    String? productCategory,
+  }) async {
+    try {
+      isLoading.value = true;
+      paymentStatus.value = 'processing';
+
+      final url = Uri.parse(
+        "https://jubilee.jahajmarahighschool.com/api/index.php",
+      );
+
+      // Generate unique transaction ID
+      final tranId = 'TXN_${DateTime.now().millisecondsSinceEpoch}';
+      transactionId.value = tranId;
+
+      final formData = {
+        "store_id": storeId,
+        "store_passwd": storePassword,
+        "total_amount": amount,
+        "currency": currency,
+        "tran_id": tranId,
+        "success_url":
+            "https://jubilee.jahajmarahighschool.com/api/payment-success.php",
+        "fail_url":
+            "https://jubilee.jahajmarahighschool.com/api/payment-fail.php",
+        "cancel_url":
+            "https://jubilee.jahajmarahighschool.com/api/payment-cancel.php",
+        // Customer info
+        'cus_name': customerName,
+        'cus_email': customerEmail,
+        'cus_add1': customerAddress,
+        'cus_city': "Dhaka",
+        'cus_state': "Dhaka",
+        'cus_postcode': '1209',
+        'cus_country': 'Bangladesh',
+        'cus_phone': customerPhone,
+        // Shipping info
+        'ship_name': customerName,
+        'ship_add1': customerAddress,
+        'ship_city': 'Dhaka',
+        'ship_state': 'Dhaka',
+        'ship_postcode': '1209',
+        'ship_country': 'Bangladesh',
+        // Product info
+        'product_name': productName ?? 'Payment',
+        'product_category': productCategory ?? 'Service',
+        'product_profile': 'general',
+        'num_of_item': '1',
+        'product_amount': amount,
+        // Gateway options
+        'multi_card_name': 'mastercard,visacard,amexcard',
+        'shipping_method': 'YES',
+      };
+
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: formData,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data["GatewayPageURL"] != null) {
+          paymentUrl.value = data["GatewayPageURL"];
+
+          if (kIsWeb) {
+            // For web → open payment in new tab and listen for success
+            _openPaymentAndListen(paymentUrl.value);
+          } else {
+            // For mobile → navigate to WebView
+            _navigateToPaymentWebView(paymentUrl.value);
+          }
+        } else {
+          _showError("Gateway URL not found!");
+          paymentStatus.value = 'failed';
+        }
+      } else {
+        _showError("Request failed: ${response.statusCode}");
+        paymentStatus.value = 'failed';
+      }
+    } catch (e) {
+      _showError("Error: $e");
+      paymentStatus.value = 'failed';
+    } finally {
+      isLoading.value = false;
     }
-    return isSandbox
-        ? 'https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php'
-        : 'https://securepay.sslcommerz.com/validator/api/validationserverAPI.php';
   }
 
-  /// Get the EMI API URL based on environment and proxy settings
-  static String get emiApiUrl {
-    if (useProxy) {
-      return '$proxyServerUrl$proxyEmiEndpoint';
+  /// Navigate to payment WebView (for mobile)
+  void _navigateToPaymentWebView(String url) {
+    // This should be handled in the UI layer
+    Get.snackbar(
+      'Payment',
+      'Opening payment page...',
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+    );
+    // The UI layer should handle navigation to WebView
+  }
+
+  final registrationController = Get.put(RegistrationController());
+
+  /// Open payment in new tab and listen for completion (for web)
+  void _openPaymentAndListen(String paymentUrl) {
+    // Open payment in new tab
+    html.window.open(paymentUrl, '_blank');
+    _showSuccess("Payment page opened in new tab");
+
+    // Listen for payment completion messages
+    html.window.addEventListener('message', (event) async {
+      final messageEvent = event as html.MessageEvent;
+      final data = messageEvent.data;
+
+      // Debug logging
+      print('🔔 Received message: $data');
+      print('🔔 Message type: ${data is Map ? data['type'] : 'Not a map'}');
+
+      if (data is Map && data['type'] != null) {
+        print('✅ Processing message type: ${data['type']}');
+        switch (data['type']) {
+          case 'PAYMENT_SUCCESS':
+            print('🎉 Payment successful');
+            paymentStatus.value = 'success';
+            try {
+              // final registrationController = Get.find<RegistrationController>();
+              // await registrationController.saveRegistrationWithPayment(
+              //   data['data'] ?? {},
+              // );
+            } catch (e) {
+              print('Error saving registration with payment: $e');
+              _showError('নিবন্ধন সংরক্ষণে সমস্যা হয়েছে');
+            }
+            //  _showPaymentSuccessDialog(data['data']);
+            break;
+          case 'PAYMENT_FAILED':
+            print('❌ Payment failed');
+            paymentStatus.value = 'failed';
+            _showPaymentFailedDialog(data['data']);
+            break;
+          case 'PAYMENT_CANCELLED':
+            print('⚠️ Payment cancelled');
+            paymentStatus.value = 'cancelled';
+            _showPaymentCancelledDialog();
+            break;
+          default:
+            print('❓ Unknown message type: ${data['type']}');
+        }
+      } else {
+        print('❌ Message data is not valid: $data');
+      }
+    });
+
+    // Also show success dialog after a delay as fallback
+    Future.delayed(const Duration(seconds: 3), () {
+      _showInfo("Check the payment tab for completion status");
+    });
+
+    // Alternative: Poll for payment completion (fallback method)
+    _startPaymentStatusPolling();
+  }
+
+  /// Start polling for payment status
+  void _startPaymentStatusPolling() {
+    print('🚀 Starting payment status polling...');
+
+    // Cancel any existing timer
+    _pollingTimer?.cancel();
+
+    // Poll every 2 seconds to check for payment completion
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      print('🔄 Polling for payment status... (attempt ${timer.tick})');
+
+      // Check with server for payment status
+      _checkPaymentStatus(timer);
+
+      // Cancel after 10 minutes (300 attempts * 2 seconds = 10 minutes)
+      if (timer.tick > 300) {
+        timer.cancel();
+        print('⏰ Payment polling timeout after 10 minutes');
+        _showInfo(
+          "Payment check timeout. Please verify payment status manually.",
+        );
+      }
+    });
+  }
+
+  /// Check payment status with server
+  Future<void> _checkPaymentStatus(Timer timer) async {
+    try {
+      // Check if there are any recent successful payments
+      // This is a simple approach - in production you'd check with your specific transaction ID
+      final response = await http.get(
+        Uri.parse(
+          'https://jubilee.jahajmarahighschool.com/api/payment-status.php?tran_id=${transactionId.value}',
+        ),
+      );
+
+      print('💬 Payment status check response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('📊 Payment status data: $data');
+
+        if (data['status'] == 'COMPLETED') {
+          print('🎉 Payment completed! Showing success dialog');
+          timer.cancel();
+          paymentStatus.value = 'success';
+          try {
+            final registrationController = Get.find<RegistrationController>();
+            await registrationController.saveRegistrationWithPayment(
+              data['payment_data'] ?? {},
+            );
+          } catch (e) {
+            print('Error saving registration with payment: $e');
+            _showError('নিবন্ধন সংরক্ষণে সমস্যা হয়েছে');
+          }
+          //_showPaymentSuccessDialog(data['payment_data']);
+        }
+      }
+    } catch (e) {
+      print('❌ Error checking payment status: $e');
     }
-    return isSandbox
-        ? 'https://sandbox.sslcommerz.com/securepay/api.php/get_emi'
-        : 'https://securepay.sslcommerz.com/securepay/api.php/get_emi';
+  }
+
+  // ============================================================================
+  // DIALOG METHODS
+  // ============================================================================
+
+  /// Show payment success dialog
+  void _showPaymentSuccessDialog(Map<String, dynamic>? paymentData) {
+    Get.dialog(
+      AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 30),
+            SizedBox(width: 10),
+            Text('Payment Successful!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your payment has been processed successfully.'),
+            const SizedBox(height: 16),
+            if (paymentData != null) ...[
+              _buildPaymentDetail('Transaction ID:', paymentData['tran_id']),
+              _buildPaymentDetail(
+                'Amount:',
+                '${paymentData['amount']} ${paymentData['currency']}',
+              ),
+              _buildPaymentDetail('Payment Method:', paymentData['card_type']),
+              _buildPaymentDetail('Status:', paymentData['status']),
+              if (paymentData['bank_tran_id'] != null)
+                _buildPaymentDetail(
+                  'Bank Transaction ID:',
+                  paymentData['bank_tran_id'],
+                ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show payment failed dialog
+  void _showPaymentFailedDialog(Map<String, dynamic>? paymentData) {
+    Get.dialog(
+      AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error, color: Colors.red, size: 30),
+            SizedBox(width: 10),
+            Text('Payment Failed'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Unfortunately, your payment could not be processed.'),
+            const SizedBox(height: 16),
+            if (paymentData != null && paymentData['error'] != null)
+              Text('Reason: ${paymentData['error']}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+            },
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show payment cancelled dialog
+  void _showPaymentCancelledDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cancel, color: Colors.orange, size: 30),
+            SizedBox(width: 10),
+            Text('Payment Cancelled'),
+          ],
+        ),
+        content: const Text('You have cancelled the payment process.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build payment detail widget
+  Widget _buildPaymentDetail(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
   }
 
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
 
-  /// Get basic store configuration as a map
-  static Map<String, String> getStoreConfig() {
-    return {
-      'store_id': storeId,
-      'store_passwd': storePassword,
-      'currency': currency,
-      'success_url': successUrl,
-      'fail_url': failUrl,
-      'cancel_url': cancelUrl,
-      'ipn_url': ipnUrl,
-    };
+  /// Show success message
+  void _showSuccess(String message) {
+    Get.snackbar(
+      'Success',
+      message,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      icon: const Icon(Icons.check_circle, color: Colors.white),
+    );
   }
 
-  /// Get default customer information for testing
-  static Map<String, String> getDefaultCustomerInfo() {
-    return {
-      'cus_name': 'Test Customer',
-      'cus_email': 'test@example.com',
-      'cus_add1': storeAddress,
-      'cus_add2': storeCity,
-      'cus_city': storeCity,
-      'cus_state': storeCity,
-      'cus_postcode': storePostcode,
-      'cus_country': storeCountry,
-      'cus_phone': storePhone,
-      'cus_fax': storePhone,
-    };
+  /// Show error message
+  void _showError(String message) {
+    Get.snackbar(
+      'Error',
+      message,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      icon: const Icon(Icons.error, color: Colors.white),
+    );
   }
 
-  /// Get default shipping information for testing
-  static Map<String, String> getDefaultShippingInfo() {
-    return {
-      'ship_name': 'Test Customer',
-      'ship_add1': storeAddress,
-      'ship_add2': storeCity,
-      'ship_city': storeCity,
-      'ship_state': storeCity,
-      'ship_postcode': storePostcode,
-      'ship_country': storeCountry,
-    };
+  /// Show info message
+  void _showInfo(String message) {
+    Get.snackbar(
+      'Info',
+      message,
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+      icon: const Icon(Icons.info, color: Colors.white),
+    );
   }
 
-  /// Get payment method configuration
-  static Map<String, String> getPaymentConfig() {
-    return {
-      'multi_card_name': supportedCards,
-      'shipping_method': shippingMethod,
-      'emi_option': emiOption.toString(),
+  /// Test success dialog (for testing purposes)
+  void testSuccessDialog() {
+    final testData = {
+      'tran_id': 'TEST123',
+      'amount': '1000.00',
+      'currency': 'BDT',
+      'card_type': 'TEST-Payment',
+      'status': 'VALID',
+      'bank_tran_id': 'TEST_BANK_123',
     };
+    _showPaymentSuccessDialog(testData);
+  }
+
+  /// Reset payment state
+  void resetPaymentState() {
+    isLoading.value = false;
+    paymentStatus.value = '';
+    transactionId.value = '';
+    paymentUrl.value = '';
+    _pollingTimer?.cancel();
   }
 }

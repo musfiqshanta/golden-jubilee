@@ -19,7 +19,7 @@ import 'package:suborno_joyonti/app/services/pdf_service_web.dart'
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
 import 'package:suborno_joyonti/admin_panel/services/counter_service.dart';
-import 'package:suborno_joyonti/services/sslcommerz_service.dart';
+import 'package:suborno_joyonti/services/sslcommerz_config.dart';
 
 class RegistrationController extends GetxController {
   // Form controllers
@@ -574,211 +574,18 @@ class RegistrationController extends GetxController {
     registrationData['transactionFee'] = transactionFee;
     registrationData['totalPayable'] = totalAmount;
 
-    // Create payment request
-    final paymentRequest = SSLCommerzService.createRegistrationPayment(
-      registrationData: registrationData,
-      amount: totalAmount.toDouble(),
+    // Payment integration removed - using SSLCommerzService
+    final sslConfig = Get.put(SSLCommerzConfig());
+    sslConfig.makePaymentRequest(
+      amount: totalAmount.toString(),
+      customerName: nameController.text.trim(),
+      customerEmail: emailController.text.trim(),
+      customerPhone: mobileController.text.trim(),
+      customerAddress: presentAddressController.text.trim(),
+      productName: 'Registration',
     );
-
-    // Launch payment
-    await SSLCommerzService.launchPayment(
-      context: Get.context!,
-      request: paymentRequest,
-      onSuccess: (paymentData) async {
-        debugPrint('Payment successful: $paymentData');
-
-        // Submit form data after successful payment
-        await _submitRegistrationAfterPayment(registrationData, paymentData);
-      },
-      onFailure: (errorData) {
-        debugPrint('Payment failed: $errorData');
-        SSLCommerzService.showPaymentFailureDialog(Get.context!, errorData);
-      },
-      onCancel: (cancelData) {
-        debugPrint('Payment cancelled: $cancelData');
-        Get.snackbar(
-          'পেমেন্ট বাতিল',
-          'পেমেন্ট বাতিল করা হয়েছে',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
-      },
-    );
-  }
-
-  /// Submit registration data after successful payment
-  Future<void> _submitRegistrationAfterPayment(
-    Map<String, dynamic> registrationData,
-    Map<String, dynamic> paymentData,
-  ) async {
-    try {
-      isLoading.value = true;
-
-      // Show loading dialog
-      Get.dialog(
-        Center(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
-                ),
-                SizedBox(height: 24),
-                Text(
-                  'তথ্য সংরক্ষণ হচ্ছে এবং PDF জেনারেট হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF8B6914),
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.none,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-        barrierDismissible: false,
-      );
-
-      // Upload photo first
-      String? photoUrl;
-      if (selectedPhoto.value != null) {
-        try {
-          if (!kIsWeb &&
-              selectedPhoto.value!.path != null &&
-              selectedPhoto.value!.path!.isNotEmpty) {
-            photoUrl = await uploadPhoto(File(selectedPhoto.value!.path!));
-          } else {
-            photoUrl = await uploadPhoto(File(''));
-          }
-          if (photoUrl == null) {
-            Get.back(); // Dismiss loading
-            Get.snackbar(
-              'ছবি আপলোড ব্যর্থ',
-              'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
-              backgroundColor: Colors.redAccent,
-              colorText: Colors.white,
-            );
-            isLoading.value = false;
-            return;
-          }
-        } catch (e) {
-          Get.back(); // Dismiss loading
-          Get.snackbar(
-            'ছবি আপলোড ব্যর্থ',
-            'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
-            backgroundColor: Colors.redAccent,
-            colorText: Colors.white,
-          );
-          isLoading.value = false;
-          return;
-        }
-      }
-
-      // Add payment information to registration data
-      registrationData['paymentStatus'] = 'approved';
-      registrationData['paymentData'] = paymentData;
-      registrationData['paymentTimestamp'] = DateTime.now().toIso8601String();
-      if (photoUrl != null) {
-        registrationData['photoUrl'] = photoUrl;
-      }
-
-      // Get form serial number
-      final batch = registrationData['batch'] as String;
-      final counterRef = FirebaseFirestore.instance
-          .collection('counters')
-          .doc('registration');
-      int formSerialNumber = 1;
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final snapshot = await transaction.get(counterRef);
-        if (snapshot.exists) {
-          formSerialNumber = (snapshot.data()?['value'] ?? 0) + 1;
-          transaction.update(counterRef, {'value': formSerialNumber});
-        } else {
-          transaction.set(counterRef, {'value': 1});
-          formSerialNumber = 1;
-        }
-      });
-      registrationData['formSerialNumber'] = formSerialNumber;
-
-      // Save to Firestore
-      final phone = mobileController.text.trim();
-      await FirebaseFirestore.instance
-          .collection(CollectionConfig.batchesCollection)
-          .doc(batch)
-          .collection(CollectionConfig.registrationsCollection)
-          .doc(phone)
-          .set(registrationData);
-
-      // Update counters
-      try {
-        final counterService = CounterService();
-        await counterService.incrementTotalRegistrations();
-
-        final int guestCount = spouseCount.value + childCount.value;
-        if (guestCount > 0) {
-          await counterService.updateTotalGuests(guestCount);
-        }
-      } catch (e) {
-        print('Warning: Failed to update counters: $e');
-      }
-
-      // Generate and download PDF
-      try {
-        await PdfService.generateRegistrationPdfFromData(
-          registrationData,
-          onBeforeOpen: () {
-            if (Get.isDialogOpen ?? false) Get.back();
-          },
-        );
-      } catch (e) {
-        print('PDF generation error: $e');
-        Get.snackbar(
-          'সতর্কতা',
-          'নিবন্ধন সফল হয়েছে কিন্তু পিডিএফ তৈরি করতে সমস্যা হয়েছে',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
-      }
-
-      // Clear form
-      clearForm();
-
-      // Show success dialog after data is saved
-      SSLCommerzService.showPaymentSuccessDialog(Get.context!, paymentData);
-
-      Get.snackbar(
-        'সফল',
-        'নিবন্ধন সফলভাবে সম্পন্ন হয়েছে এবং পেমেন্ট গ্রহণ করা হয়েছে!',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-      );
-    } catch (error) {
-      Get.back(); // Dismiss loading on error
-      Get.snackbar(
-        'ত্রুটি',
-        'নিবন্ধন সংরক্ষণে সমস্যা হয়েছে: $error',
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
+    return;
+    // For now, just show a message that payment is not available
   }
 
   Future<void> saveRegistration() async {
@@ -1024,6 +831,258 @@ class RegistrationController extends GetxController {
       Get.snackbar('Error', 'Registration failed: $error');
     }
     isLoading.value = false;
+  }
+
+  /// Save registration with payment details after successful payment
+  Future<void> saveRegistrationWithPayment(
+    Map<String, dynamic> paymentData,
+  ) async {
+    try {
+      isLoading.value = true;
+
+      // Show loading dialog with proper Material Design
+      Get.dialog(
+        Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFFD4AF37),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'নিবন্ধন সংরক্ষণ করা হচ্ছে...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF8B6914),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'অনুগ্রহ করে অপেক্ষা করুন',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+        name: 'registration_loading',
+      );
+
+      // Validate photo upload
+      if (selectedPhoto.value == null) {
+        Get.back(); // Close loading dialog
+        photoError.value = 'ছবি আপলোড করা বাধ্যতামূলক';
+        Get.snackbar(
+          'ত্রুটি',
+          'ছবি আপলোড করা বাধ্যতামূলক',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      final isRunning = isRunningStudent.value;
+      final batch =
+          isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
+      final phone = mobileController.text.trim();
+
+      // Upload photo first
+      String? photoUrl;
+      try {
+        if (!kIsWeb &&
+            selectedPhoto.value!.path != null &&
+            selectedPhoto.value!.path!.isNotEmpty) {
+          photoUrl = await uploadPhoto(File(selectedPhoto.value!.path!));
+        } else {
+          photoUrl = await uploadPhoto(File(''));
+        }
+        if (photoUrl == null) {
+          Get.back(); // Dismiss loading
+          Get.snackbar(
+            'ছবি আপলোড ব্যর্থ',
+            'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      } catch (e) {
+        Get.back(); // Dismiss loading
+        Get.snackbar(
+          'ছবি আপলোড ব্যর্থ',
+          'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Collect registration data
+      final registrationData = _collectRegistrationData(batch);
+
+      // Add photo URL
+      registrationData['photoUrl'] = photoUrl;
+
+      // Add payment information
+      registrationData['paymentStatus'] = 'approved';
+      registrationData['paymentData'] = paymentData;
+      registrationData['paymentTimestamp'] = DateTime.now().toIso8601String();
+
+      // Extract payment details for easier access
+      if (paymentData.containsKey('tran_id')) {
+        registrationData['transactionId'] = paymentData['tran_id'];
+      }
+      if (paymentData.containsKey('amount')) {
+        registrationData['paidAmount'] = paymentData['amount'];
+      }
+      if (paymentData.containsKey('card_type')) {
+        registrationData['paymentMethod'] = paymentData['card_type'];
+      }
+      if (paymentData.containsKey('bank_tran_id')) {
+        registrationData['bankTransactionId'] = paymentData['bank_tran_id'];
+      }
+
+      // Get form serial number
+      final counterRef = FirebaseFirestore.instance
+          .collection('counters')
+          .doc('registration');
+      int formSerialNumber = 1;
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(counterRef);
+        if (snapshot.exists) {
+          formSerialNumber = (snapshot.data()?['value'] ?? 0) + 1;
+          transaction.update(counterRef, {'value': formSerialNumber});
+        } else {
+          transaction.set(counterRef, {'value': 1});
+          formSerialNumber = 1;
+        }
+      });
+      registrationData['formSerialNumber'] = formSerialNumber;
+
+      // Save to Firestore
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(batch)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(phone)
+          .set(registrationData);
+
+      // Update counters (don't fail the whole process if this fails)
+      try {
+        final counterService = CounterService();
+        await counterService.incrementTotalRegistrations();
+        await counterService.incrementTotalApprovedUsers();
+
+        // Add payment amount to total collections
+        final paidAmount =
+            double.tryParse(paymentData['amount']?.toString() ?? '0') ?? 0.0;
+        await counterService.updateTotalCollections(paidAmount);
+
+        final int guestCount = spouseCount.value + childCount.value;
+        if (guestCount > 0) {
+          await counterService.updateTotalGuests(guestCount);
+        }
+        print('✅ Counters updated successfully');
+      } catch (e) {
+        print(
+          '⚠️ Warning: Failed to update counters (registration still successful): $e',
+        );
+        // Don't show error to user - counters are not critical for registration success
+      }
+
+      // Clear form before PDF generation
+      clearForm();
+
+      // Generate and download PDF
+      bool pdfSuccess = false;
+      try {
+        // Close loading dialog before PDF generation
+        if (Get.isDialogOpen ?? false) {
+          Get.back();
+          await Future.delayed(
+            const Duration(milliseconds: 100),
+          ); // Small delay to ensure dialog is closed
+        }
+
+        await PdfService.generateRegistrationPdfFromData(registrationData);
+        pdfSuccess = true;
+        isLoading.value = false;
+
+        print('✅ PDF generated successfully');
+      } catch (e) {
+        print('⚠️ PDF generation error: $e');
+        // Show warning but don't fail the registration
+        Get.snackbar(
+          'সতর্কতা',
+          'নিবন্ধন সফল হয়েছে কিন্তু পিডিএফ তৈরি করতে সমস্যা হয়েছে। আপনি পরে "নিবন্ধন যাচাই" থেকে পিডিএফ ডাউনলোড করতে পারবেন।',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+      }
+
+      // Ensure loading dialog is closed\
+      Get.back();
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      // Show success message
+      Get.snackbar(
+        'সফল!',
+        pdfSuccess
+            ? 'পেমেন্ট সফল হয়েছে এবং নিবন্ধন সম্পন্ন হয়েছে! পিডিএফ ডাউনলোড হয়েছে।'
+            : 'পেমেন্ট সফল হয়েছে এবং নিবন্ধন সম্পন্ন হয়েছে!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+        snackPosition: SnackPosition.TOP,
+      );
+
+      print('✅ Registration with payment completed successfully');
+    } catch (error) {
+      // Ensure loading dialog is closed on any error
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      print('❌ Registration save error: $error');
+
+      Get.snackbar(
+        'ত্রুটি',
+        'নিবন্ধন সংরক্ষণে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।\nত্রুটি: $error',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 6),
+        snackPosition: SnackPosition.TOP,
+      );
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Map<String, dynamic> _collectRegistrationData(String batch) {

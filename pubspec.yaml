@@ -63,6 +63,9 @@ dependencies:
   flutter_sslcommerz: ^2.5.1
   webview_flutter: ^4.13.0
 
+  # Environment variables
+  flutter_dotenv: ^5.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -89,6 +92,7 @@ flutter:
     - assets/logo.png
     - assets/fonts/NotoSansBengali-Regular.ttf
     - assets/fonts/kalpurush.ttf
+    - config.env
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

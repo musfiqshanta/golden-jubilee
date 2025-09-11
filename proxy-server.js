@@ -5,8 +5,46 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 const PORT = 3001;
 
-// Enable CORS for all routes
-app.use(cors());
+// Enhanced CORS configuration for Hostinger deployment
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Allow your production domain
+    const allowedOrigins = [
+      'https://jubilee.jahajmarahighschool.com',
+      'https://www.jubilee.jahajmarahighschool.com',
+    ];
+
+    // Allow any localhost port for development
+    if (origin && origin.startsWith('http://localhost:')) {
+      console.log('✅ Allowing localhost origin:', origin);
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // For production, you might want to be more restrictive
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  maxAge: 86400 // 24 hours
+}));
 
 // Don't parse any bodies globally - let the proxy handle everything raw
 // But we need to parse bodies for our payment callback routes
@@ -127,9 +165,16 @@ app.use('/api/sslcommerz/initiate', createProxyMiddleware({
     '^/api/sslcommerz/initiate': '', // Remove the path prefix
   },
   onProxyReq: (proxyReq, req, res) => {
-    console.log('🚀 Proxying payment initiate request');
+    console.log('🚀 Proxying payment initiate request (SANDBOX)');
     console.log('Method:', req.method);
     console.log('Content-Type:', req.headers['content-type']);
+    console.log('Origin:', req.headers['origin']);
+    console.log('User-Agent:', req.headers['user-agent']);
+    console.log('Body length:', req.headers['content-length']);
+  },
+  onError: (err, req, res) => {
+    console.error('❌ Proxy error:', err);
+    res.status(500).json({ error: 'Proxy error', details: err.message });
   }
 }));
 
@@ -140,26 +185,62 @@ app.use('/api/sslcommerz/validate', createProxyMiddleware({
     '^/api/sslcommerz/validate': '', // Remove the path prefix
   },
   onProxyReq: (proxyReq, req, res) => {
-    console.log('🔍 Proxying payment validation request');
+    console.log('🔍 Proxying payment validation request (PRODUCTION)');
     console.log('Method:', req.method);
     console.log('Content-Type:', req.headers['content-type']);
   }
 }));
 
-// EMI API endpoint proxy
-app.use('/api/sslcommerz/emi', createProxyMiddleware({
-  target: 'https://sandbox.sslcommerz.com',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/sslcommerz/emi': '/securepay/api.php/get_emi', // Map to EMI endpoint
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log('💳 Proxying EMI request');
-    console.log('Method:', req.method);
-    console.log('Content-Type:', req.headers['content-type']);
-  }
-}));
+// EMI API endpoint proxy - Return empty response since EMI is disabled
+app.use('/api/sslcommerz/emi', (req, res) => {
+  console.log('💳 EMI request received (EMI disabled)');
+  console.log('Method:', req.method);
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Origin:', req.headers['origin']);
 
-app.listen(PORT, () => {
-  console.log(`Proxy server running on http://localhost:${PORT}`);
+  // Return empty EMI response since EMI is disabled
+  res.json({
+    status: 'SUCCESS',
+    message: 'EMI is disabled for this store',
+    emi_options: []
+  });
+});
+
+// Catch-all route for SSLCommerz EMI requests that bypass our proxy
+app.use('/securepay/api.php/get_emi', (req, res) => {
+  console.log('💳 Direct EMI request intercepted (EMI disabled)');
+  console.log('Method:', req.method);
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Origin:', req.headers['origin']);
+  console.log('User-Agent:', req.headers['user-agent']);
+
+  // Return empty EMI response since EMI is disabled
+  res.json({
+    status: 'SUCCESS',
+    message: 'EMI is disabled for this store',
+    emi_options: []
+  });
+});
+
+// Production-ready server configuration
+const server = app.listen(process.env.PORT || PORT, '0.0.0.0', () => {
+  const port = server.address().port;
+  console.log(`🚀 Proxy server running on port ${port}`);
+  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS enabled for production domains`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
 });
