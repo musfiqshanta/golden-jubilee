@@ -192,17 +192,9 @@ class SSLCommerzConfig extends GetxController {
         switch (data['type']) {
           case 'PAYMENT_SUCCESS':
             print('🎉 Payment successful');
-            paymentStatus.value = 'success';
-            try {
-              // final registrationController = Get.find<RegistrationController>();
-              // await registrationController.saveRegistrationWithPayment(
-              //   data['data'] ?? {},
-              // );
-            } catch (e) {
-              print('Error saving registration with payment: $e');
-              _showError('নিবন্ধন সংরক্ষণে সমস্যা হয়েছে');
-            }
-            //  _showPaymentSuccessDialog(data['data']);
+            //   paymentStatus.value = 'success';
+            // await _handlePaymentSuccess(data['data'] ?? {});
+            // _showPaymentSuccessDialog(data['data']);
             break;
           case 'PAYMENT_FAILED':
             print('❌ Payment failed');
@@ -277,15 +269,7 @@ class SSLCommerzConfig extends GetxController {
           print('🎉 Payment completed! Showing success dialog');
           timer.cancel();
           paymentStatus.value = 'success';
-          try {
-            final registrationController = Get.find<RegistrationController>();
-            await registrationController.saveRegistrationWithPayment(
-              data['payment_data'] ?? {},
-            );
-          } catch (e) {
-            print('Error saving registration with payment: $e');
-            _showError('নিবন্ধন সংরক্ষণে সমস্যা হয়েছে');
-          }
+          await _handlePaymentSuccess(data['payment_data'] ?? {});
           //_showPaymentSuccessDialog(data['payment_data']);
         }
       }
@@ -295,11 +279,39 @@ class SSLCommerzConfig extends GetxController {
   }
 
   // ============================================================================
+  // PAYMENT SUCCESS HANDLER
+  // ============================================================================
+
+  /// Handle payment success - works for both new registrations and existing payments
+  Future<void> _handlePaymentSuccess(Map<String, dynamic> paymentData) async {
+    try {
+      // Try to find registration controller (for new registrations)
+      try {
+        final registrationController = Get.find<RegistrationController>();
+        await registrationController.saveRegistrationWithPayment(paymentData);
+        print('✅ New registration with payment saved successfully');
+        return;
+      } catch (e) {
+        print(
+          'ℹ️ Registration controller not found - this might be an existing registration payment',
+        );
+      }
+
+      // For existing registration payments, the check registration page
+      // will handle the success via the paymentStatus observable
+      print('✅ Payment successful - notifying listeners via paymentStatus');
+    } catch (e) {
+      print('❌ Error in payment success handler: $e');
+      _showError('পেমেন্ট প্রক্রিয়াকরণে সমস্যা হয়েছে');
+    }
+  }
+
+  // ============================================================================
   // DIALOG METHODS
   // ============================================================================
 
   /// Show payment success dialog
-  void _showPaymentSuccessDialog(Map<String, dynamic>? paymentData) {
+  void _showPaymentSuccessDialogs(Map<String, dynamic>? paymentData) {
     Get.dialog(
       AlertDialog(
         title: const Row(
@@ -464,7 +476,7 @@ class SSLCommerzConfig extends GetxController {
       'status': 'VALID',
       'bank_tran_id': 'TEST_BANK_123',
     };
-    _showPaymentSuccessDialog(testData);
+    //_showPaymentSuccessDialog(testData);
   }
 
   /// Reset payment state

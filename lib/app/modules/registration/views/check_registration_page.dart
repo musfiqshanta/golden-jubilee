@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
 import 'package:suborno_joyonti/app/modules/registration/views/update_registration_page.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
+import 'package:suborno_joyonti/services/sslcommerz_config.dart';
 
 class CheckRegistrationPage extends StatefulWidget {
   const CheckRegistrationPage({super.key});
@@ -21,11 +22,72 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
   bool hasSearched = false;
   bool isLoadingBatches = true;
   bool _isPdfLoading = false; // Add loading state for PDF
+  bool _isPaymentUpdateLoading = false; // Add loading state for payment update
+  Map<String, dynamic>?
+  _pendingPaymentRegistration; // Store registration for payment callback
 
   @override
   void initState() {
     super.initState();
     _loadBatches();
+    _setupPaymentListener();
+  }
+
+  void _setupPaymentListener() {
+    // Listen for payment success from SSLCommerz
+    try {
+      final sslConfig = Get.find<SSLCommerzConfig>();
+      ever(sslConfig.paymentStatus, (status) {
+        if (status == 'success' && _pendingPaymentRegistration != null) {
+          // Payment successful for pending registration
+          _handlePaymentSuccess();
+        }
+      });
+    } catch (e) {
+      print('Payment listener setup failed: $e');
+    }
+  }
+
+  void _handlePaymentSuccess() async {
+    if (_pendingPaymentRegistration == null) {
+      print('⚠️ No pending payment registration found');
+      return;
+    }
+
+    print(
+      '🎉 Handling payment success for: ${_pendingPaymentRegistration!['name']}',
+    );
+
+    try {
+      // Get payment data from SSL Commerz config
+      final sslConfig = Get.find<SSLCommerzConfig>();
+      final paymentData = <String, dynamic>{
+        'tran_id': sslConfig.transactionId.value,
+        'amount': _pendingPaymentRegistration!['totalPayable'].toString(),
+        'payment_method': 'SSLCommerz',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      print('💳 Payment data: $paymentData');
+
+      await _updateRegistrationAfterPayment(
+        _pendingPaymentRegistration!,
+        paymentData,
+      );
+      _pendingPaymentRegistration = null; // Clear pending registration
+
+      print('✅ Payment handling completed successfully');
+    } catch (e) {
+      print('❌ Error handling payment success: $e');
+      Get.snackbar(
+        'ত্রুটি',
+        'পেমেন্ট সফল হলেও তথ্য আপডেটে সমস্যা হয়েছে। পেজ রিফ্রেশ করুন।',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.TOP,
+      );
+    }
   }
 
   @override
@@ -604,6 +666,52 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                 ),
               ),
             ),
+          if (_isPaymentUpdateLoading)
+            Container(
+              color: Colors.black.withOpacity(0.8),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFFD4AF37),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'পেমেন্ট তথ্য আপডেট করা হচ্ছে...',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF8B6914),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'অনুগ্রহ করে অপেক্ষা করুন',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1017,14 +1125,25 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
         final baseAmount = registration['totalPayable'] ?? 0;
         final transactionFee = (baseAmount * 0.025).round();
         totalAmount = baseAmount + transactionFee;
+
+        // Update the registration data with transaction fee details
+        registration['baseAmount'] = baseAmount;
+        registration['transactionFee'] = transactionFee;
+        registration['totalPayable'] = totalAmount;
       }
 
-      // SSLCommerzService removed - show message instead
-      Get.snackbar(
-        'পেমেন্ট সিস্টেম',
-        'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      // Store registration data for payment callback
+      _pendingPaymentRegistration = registration;
+
+      // Initialize SSL Commerz and make payment request
+      final sslConfig = Get.put(SSLCommerzConfig());
+      await sslConfig.makePaymentRequest(
+        amount: totalAmount.toString(),
+        customerName: registration['name'] ?? '',
+        customerEmail: registration['email'] ?? '',
+        customerPhone: registration['mobile'] ?? '',
+        customerAddress: registration['presentAddress'] ?? '',
+        productName: 'Registration Payment',
       );
     } catch (e) {
       debugPrint('Payment initiation error: $e');
@@ -1043,23 +1162,10 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     Map<String, dynamic> paymentData,
   ) async {
     try {
-      // Show loading
-      Get.dialog(
-        const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(
-                'পেমেন্ট তথ্য আপডেট করা হচ্ছে...',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-        barrierDismissible: false,
-      );
+      // Show loading state instead of dialog
+      setState(() {
+        _isPaymentUpdateLoading = true;
+      });
 
       // Update payment information
       final updatedData = Map<String, dynamic>.from(registration);
@@ -1078,42 +1184,44 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
           .doc(phone)
           .update(updatedData);
 
-      // Close loading dialog
-      Get.back();
-
-      // Update local state and refresh UI
+      // Update local state and clear loading
       setState(() {
         foundRegistration = updatedData;
+        _isPaymentUpdateLoading = false;
       });
 
-      // Show success dialog after data is updated
-      // SSLCommerzService dialog removed
-
-      // Also show success message
+      // Show success message
       Get.snackbar(
-        'সফল',
+        'সফল!',
         'পেমেন্ট সফলভাবে সম্পন্ন হয়েছে এবং নিবন্ধন অনুমোদিত হয়েছে!',
         backgroundColor: Colors.green,
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4),
+        snackPosition: SnackPosition.TOP,
       );
 
       // Refresh the search to show updated data
       if (phoneController.text.isNotEmpty) {
+        await Future.delayed(const Duration(milliseconds: 500));
         _checkRegistration();
       }
-    } catch (error) {
-      // Close loading dialog if still open
-      if (Get.isDialogOpen ?? false) {
-        Get.back();
-      }
 
-      debugPrint('Update registration error: $error');
+      print('✅ Payment update completed successfully');
+    } catch (error) {
+      // Clear loading state on error
+      setState(() {
+        _isPaymentUpdateLoading = false;
+      });
+
+      print('❌ Payment update error: $error');
+
       Get.snackbar(
         'ত্রুটি',
-        'নিবন্ধন আপডেট করতে সমস্যা হয়েছে: $error',
+        'পেমেন্ট সফল হলেও তথ্য আপডেটে সমস্যা হয়েছে। অনুগ্রহ করে পেজ রিফ্রেশ করুন।',
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.TOP,
       );
     }
   }

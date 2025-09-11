@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:suborno_joyonti/app/modules/registration/views/check_registration_page.dart';
+import 'package:suborno_joyonti/services/sslcommerz_config.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
   final String batchId;
@@ -77,6 +78,9 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   String? paymentStatus;
   int originalSpouseCount = 0;
   int originalChildCount = 0;
+  int originalTotalPayable = 0;
+  Map<String, dynamic>?
+  _pendingAdditionalPayment; // Store additional payment info
 
   // Dropdown lists
   final List<String> tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -239,6 +243,150 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     super.initState();
     _initializeControllers();
     _initializeGuestDetails();
+    _setupPaymentListener();
+  }
+
+  void _setupPaymentListener() {
+    // Listen for payment success from SSLCommerz
+    try {
+      final sslConfig = Get.find<SSLCommerzConfig>();
+      ever(sslConfig.paymentStatus, (status) {
+        if (status == 'success' && _pendingAdditionalPayment != null) {
+          // Payment successful for additional guests
+          _handleAdditionalPaymentSuccess();
+        }
+      });
+    } catch (e) {
+      print('Additional payment listener setup failed: $e');
+    }
+  }
+
+  void _handleAdditionalPaymentSuccess() async {
+    if (_pendingAdditionalPayment == null) return;
+
+    try {
+      // Get payment data from SSL Commerz config
+      final sslConfig = Get.find<SSLCommerzConfig>();
+      final paymentData = <String, dynamic>{
+        'tran_id': sslConfig.transactionId.value,
+        'amount': _pendingAdditionalPayment!['amount'].toString(),
+        'payment_method': 'SSLCommerz',
+        'timestamp': DateTime.now().toIso8601String(),
+        'type': 'additional_guest_payment',
+      };
+
+      await _processAdditionalPaymentSuccess(paymentData);
+      _pendingAdditionalPayment = null; // Clear pending payment
+    } catch (e) {
+      print('Error handling additional payment success: $e');
+      Get.snackbar(
+        'ত্রুটি',
+        'অতিরিক্ত পেমেন্ট সফল হলেও তথ্য আপডেটে সমস্যা হয়েছে',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _processAdditionalPaymentSuccess(
+    Map<String, dynamic> paymentData,
+  ) async {
+    try {
+      setState(() => isLoading = true);
+
+      final currentTotalGuests = spouseCount + childCount;
+      final originalTotalGuests = originalSpouseCount + originalChildCount;
+      final additionalGuests = currentTotalGuests - originalTotalGuests;
+      final additionalGuestFee = additionalGuests * 500;
+      final transactionFee =
+          (_pendingAdditionalPayment!['amount'] as int) - additionalGuestFee;
+
+      // Update registration data in Firestore
+      final data = {
+        'name': nameController.text.trim(),
+        'fatherName': fatherNameController.text.trim(),
+        'motherName': motherNameController.text.trim(),
+        'mobile': mobileController.text.trim(),
+        'email': emailController.text.trim(),
+        'occupation': occupationController.text.trim(),
+        'designation': designationController.text.trim(),
+        'permanentAddress': permanentAddressController.text.trim(),
+        'presentAddress': presentAddressController.text.trim(),
+        'workplaceAddress': workplaceAddressController.text.trim(),
+        'nationalId': nationalIdController.text.trim(),
+        'gender': gender,
+        'nationality': nationality,
+        'religion': religion,
+        'bloodGroup': bloodGroup,
+        'tshirtSize': tshirtSize,
+        'spouseCount': spouseCount,
+        'childCount': childCount,
+        'guestNames': guestNames,
+        'guestRelationships': guestRelationships,
+        'sscPassingYear': sscPassingYear,
+        'finalClass': finalClass,
+        'year': year,
+        'isRunningStudent': isRunningStudent,
+        'isStillStudying': isStillStudying,
+        'batch': widget.batchId,
+        'totalPayable':
+            originalTotalPayable + additionalGuestFee + transactionFee,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'additionalPayments': FieldValue.arrayUnion([
+          {
+            'type': 'additional_guest_payment',
+            'additionalGuests': additionalGuests,
+            'additionalGuestFee': additionalGuestFee,
+            'transactionFee': transactionFee,
+            'totalAmount': additionalGuestFee + transactionFee,
+            'paymentData': paymentData,
+            'paymentTimestamp': DateTime.now().toIso8601String(),
+          },
+        ]),
+        'updateHistory': FieldValue.arrayUnion([
+          {
+            'action': 'additional_guest_payment',
+            'timestamp': DateTime.now().toIso8601String(),
+            'additionalGuests': additionalGuests,
+            'amount': additionalGuestFee + transactionFee,
+            'paymentData': paymentData,
+          },
+        ]),
+      };
+
+      await FirebaseFirestore.instance
+          .collection(CollectionConfig.batchesCollection)
+          .doc(widget.batchId)
+          .collection(CollectionConfig.registrationsCollection)
+          .doc(widget.phone)
+          .update(data);
+
+      // Update original counts to current counts
+      originalSpouseCount = spouseCount;
+      originalChildCount = childCount;
+      originalTotalPayable =
+          originalTotalPayable + additionalGuestFee + transactionFee;
+
+      setState(() => isLoading = false);
+
+      // Show success message
+      Get.snackbar(
+        'সফল!',
+        'অতিরিক্ত অতিথি পেমেন্ট সফল হয়েছে এবং তথ্য আপডেট হয়েছে!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+    } catch (error) {
+      setState(() => isLoading = false);
+      Get.snackbar(
+        'ত্রুটি',
+        'অতিরিক্ত পেমেন্ট সফল হলেও তথ্য আপডেটে সমস্যা: $error',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      print('Additional payment processing error: $error');
+    }
   }
 
   void _initializeControllers() {
@@ -290,6 +438,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     // Store original values for comparison
     originalSpouseCount = spouseCount;
     originalChildCount = childCount;
+    originalTotalPayable = d['totalPayable'] ?? 0;
 
     // Payment status
     paymentStatus = d['paymentStatus'] ?? 'pending';
@@ -690,13 +839,27 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       // PaymentRequest class not available - SSLCommerzService removed
       // final paymentRequest = PaymentRequest(...);
 
-      // SSLCommerzService removed - show message instead
-      Get.snackbar(
-        'পেমেন্ট সিস্টেম',
-        'পেমেন্ট সিস্টেম বর্তমানে উপলব্ধ নয়',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+      // Store additional payment info for callback
+      _pendingAdditionalPayment = {
+        'amount': amount,
+        'additionalGuests':
+            spouseCount +
+            childCount -
+            (originalSpouseCount + originalChildCount),
+        'originalTotalPayable': originalTotalPayable,
+      };
+
+      // Initialize SSL Commerz and make payment request
+      final sslConfig = Get.put(SSLCommerzConfig());
+      await sslConfig.makePaymentRequest(
+        amount: amount.toString(),
+        customerName: nameController.text.trim(),
+        customerEmail: emailController.text.trim(),
+        customerPhone: mobileController.text.trim(),
+        customerAddress: presentAddressController.text.trim(),
+        productName: 'Additional Guest Payment',
       );
+
       setState(() => isLoading = false);
     } catch (error) {
       debugPrint('Error launching additional guest payment: $error');
