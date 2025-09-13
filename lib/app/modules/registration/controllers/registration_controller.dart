@@ -565,19 +565,23 @@ class RegistrationController extends GetxController {
     final registrationData = _collectRegistrationData(batch);
     final baseAmount = registrationData['totalPayable'] as int;
 
-    // Add 2.5% transaction charge
+    // Add 2.5% transaction charge (for display only - SSLCommerz adds this automatically)
     final transactionFee = (baseAmount * 0.025).round();
-    final totalAmount = baseAmount + transactionFee;
+    final totalAmountForDisplay = baseAmount + transactionFee;
 
     // Update registration data with transaction fee details
     registrationData['baseAmount'] = baseAmount;
     registrationData['transactionFee'] = transactionFee;
-    registrationData['totalPayable'] = totalAmount;
+    registrationData['totalPayable'] =
+        totalAmountForDisplay; // Store total for display
+    registrationData['payableAmount'] =
+        baseAmount; // Store actual payable amount
 
-    // Payment integration removed - using SSLCommerzService
+    // Payment integration - using SSLCommerzService
+    // Send only base amount since SSLCommerz will add 2.5% automatically
     final sslConfig = Get.put(SSLCommerzConfig());
     sslConfig.makePaymentRequest(
-      amount: totalAmount.toString(),
+      amount: baseAmount.toString(), // Pay only base amount
       customerName: nameController.text.trim(),
       customerEmail: emailController.text.trim(),
       customerPhone: mobileController.text.trim(),

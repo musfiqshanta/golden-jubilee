@@ -491,6 +491,10 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                 customerEmail: 'test@example.com',
                                 customerPhone: '01234567890',
                                 customerAddress: 'Test Address',
+                                customerCity: 'Dhaka',
+                                customerState: 'Dhaka',
+                                customerPostcode: '1209',
+                                customerCountry: 'Bangladesh',
                                 productName: 'Test Payment',
                               ),
                           style: ElevatedButton.styleFrom(

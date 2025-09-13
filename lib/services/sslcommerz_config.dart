@@ -36,17 +36,39 @@ class SSLCommerzConfig extends GetxController {
   // STATIC CONFIGURATION
   // ============================================================================
 
-  /// SSLCommerz Store ID (Sandbox)
+  /// SSLCommerz Store ID (Dynamic: Sandbox or Production based on config.env)
   static String get storeId => EnvService.sslcommerzStoreId;
 
-  /// SSLCommerz Store Password (Sandbox)
+  /// SSLCommerz Store Password (Dynamic: Sandbox or Production based on config.env)
   static String get storePassword => EnvService.sslcommerzStorePassword;
 
-  /// Environment flag - set to false for production
+  /// Environment flag - false for production, true for sandbox
   static bool get isSandbox => EnvService.sslcommerzIsSandbox;
 
   /// Currency code for transactions
   static const String currency = "BDT";
+
+  // ============================================================================
+  // API ENDPOINTS CONFIGURATION
+  // ============================================================================
+
+  /// Get SSL Commerz API endpoint based on environment
+  static String get apiEndpoint {
+    if (isSandbox) {
+      return "https://sandbox.sslcommerz.com/gwprocess/v4/api.php";
+    } else {
+      return "https://securepay.sslcommerz.com/gwprocess/v4/api.php";
+    }
+  }
+
+  /// Your custom proxy API endpoint (current setup)
+  static String get proxyApiEndpoint {
+    return "https://jubilee.jahajmarahighschool.com/api/index.php";
+  }
+
+  /// Use proxy API (true) or direct SSL Commerz API (false)
+  static bool get useProxyApi =>
+      true; // Set to false to use direct SSL Commerz API
 
   // ============================================================================
   // LIFECYCLE METHODS
@@ -69,6 +91,10 @@ class SSLCommerzConfig extends GetxController {
     required String customerEmail,
     required String customerPhone,
     required String customerAddress,
+    String? customerCity,
+    String? customerState,
+    String? customerPostcode,
+    String? customerCountry,
     String? productName,
     String? productCategory,
   }) async {
@@ -76,9 +102,7 @@ class SSLCommerzConfig extends GetxController {
       isLoading.value = true;
       paymentStatus.value = 'processing';
 
-      final url = Uri.parse(
-        "https://jubilee.jahajmarahighschool.com/api/index.php",
-      );
+      final url = Uri.parse(useProxyApi ? proxyApiEndpoint : apiEndpoint);
 
       // Generate unique transaction ID
       final tranId = 'TXN_${DateTime.now().millisecondsSinceEpoch}';
@@ -100,27 +124,40 @@ class SSLCommerzConfig extends GetxController {
         'cus_name': customerName,
         'cus_email': customerEmail,
         'cus_add1': customerAddress,
-        'cus_city': "Dhaka",
-        'cus_state': "Dhaka",
-        'cus_postcode': '1209',
-        'cus_country': 'Bangladesh',
+        'cus_add2': customerCity ?? "Dhaka", // Additional address line
+        'cus_city': customerCity ?? "Dhaka",
+        'cus_state': customerState ?? "Dhaka",
+        'cus_postcode': customerPostcode ?? '1209',
+        'cus_country': customerCountry ?? 'Bangladesh',
         'cus_phone': customerPhone,
+        'cus_fax': customerPhone, // Using phone as fax (required field)
         // Shipping info
         'ship_name': customerName,
         'ship_add1': customerAddress,
-        'ship_city': 'Dhaka',
-        'ship_state': 'Dhaka',
-        'ship_postcode': '1209',
-        'ship_country': 'Bangladesh',
+        'ship_add2':
+            customerCity ?? "Dhaka", // Additional shipping address line
+        'ship_city': customerCity ?? 'Dhaka',
+        'ship_state': customerState ?? 'Dhaka',
+        'ship_postcode': customerPostcode ?? '1209',
+        'ship_country': customerCountry ?? 'Bangladesh',
         // Product info
         'product_name': productName ?? 'Payment',
         'product_category': productCategory ?? 'Service',
         'product_profile': 'general',
         'num_of_item': '1',
         'product_amount': amount,
-        // Gateway options
-        'multi_card_name': 'mastercard,visacard,amexcard',
-        'shipping_method': 'YES',
+        // Gateway options - All payment methods (based on SSL Commerz documentation)
+        'multi_card_name':
+            'mastercard,visacard,amexcard,mobilebank&internetbank',
+
+        // 'multi_card_name':
+        //     'mobilebank,internetbank,mastercard,visacard,amexcard,',
+        'shipping_method': 'NO',
+        // Optional value parameters for tracking
+        'value_a': tranId, // Transaction reference
+        'value_b': customerEmail, // Customer email reference
+        'value_c': productName ?? 'Payment', // Product reference
+        'value_d': DateTime.now().toIso8601String(), // Timestamp reference
       };
 
       final response = await http.post(
@@ -486,5 +523,26 @@ class SSLCommerzConfig extends GetxController {
     transactionId.value = '';
     paymentUrl.value = '';
     _pollingTimer?.cancel();
+  }
+
+  /// Get current environment configuration for verification
+  static Map<String, dynamic> getEnvironmentInfo() {
+    return {
+      'storeId': storeId,
+      'isSandbox': isSandbox,
+      'isProduction': !isSandbox,
+      'currency': currency,
+      'environmentStatus': isSandbox ? 'SANDBOX/TEST' : 'PRODUCTION/LIVE',
+    };
+  }
+
+  /// Print environment configuration (for debugging)
+  static void printEnvironmentInfo() {
+    final info = getEnvironmentInfo();
+    print('🔧 SSL Commerz Configuration:');
+    print('   Environment: ${info['environmentStatus']}');
+    print('   Store ID: ${info['storeId']}');
+    print('   Is Sandbox: ${info['isSandbox']}');
+    print('   Currency: ${info['currency']}');
   }
 }

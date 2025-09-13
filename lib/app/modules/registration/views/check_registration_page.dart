@@ -1117,32 +1117,50 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
   /// Handle Pay Now functionality for pending registrations
   void _payNow(Map<String, dynamic> registration) async {
     try {
-      // Calculate total amount (including transaction fee if not already calculated)
-      int totalAmount = registration['totalPayable'] ?? 0;
+      // Calculate amounts
+      int baseAmount;
+      int totalAmountForDisplay;
 
-      // If totalPayable doesn't include transaction fee, calculate it
-      if (registration['baseAmount'] == null) {
-        final baseAmount = registration['totalPayable'] ?? 0;
+      // If registration already has baseAmount, use it
+      if (registration['baseAmount'] != null) {
+        baseAmount = registration['baseAmount'];
+        totalAmountForDisplay = registration['totalPayable'] ?? 0;
+      } else {
+        // For old registrations without baseAmount, calculate it
+        baseAmount = registration['totalPayable'] ?? 0;
         final transactionFee = (baseAmount * 0.025).round();
-        totalAmount = baseAmount + transactionFee;
+        totalAmountForDisplay = baseAmount + transactionFee;
 
         // Update the registration data with transaction fee details
         registration['baseAmount'] = baseAmount;
         registration['transactionFee'] = transactionFee;
-        registration['totalPayable'] = totalAmount;
+        registration['totalPayable'] = totalAmountForDisplay;
+        registration['payableAmount'] = baseAmount;
       }
 
       // Store registration data for payment callback
       _pendingPaymentRegistration = registration;
 
       // Initialize SSL Commerz and make payment request
+      // Send only base amount since SSLCommerz will add 2.5% automatically
       final sslConfig = Get.put(SSLCommerzConfig());
       await sslConfig.makePaymentRequest(
-        amount: totalAmount.toString(),
+        amount: baseAmount.toString(), // Pay only base amount
         customerName: registration['name'] ?? '',
         customerEmail: registration['email'] ?? '',
         customerPhone: registration['mobile'] ?? '',
         customerAddress: registration['presentAddress'] ?? '',
+        customerCity: _extractCityFromAddress(
+          registration['presentAddress'] ?? '',
+        ),
+        customerState: _extractStateFromAddress(
+          registration['presentAddress'] ?? '',
+        ),
+        customerPostcode: _extractPostcodeFromAddress(
+          registration['presentAddress'] ?? '',
+        ),
+        customerCountry:
+            registration['nationality'] == 'বাংলাদেশী' ? 'Bangladesh' : 'Other',
         productName: 'Registration Payment',
       );
     } catch (e) {
@@ -1224,5 +1242,36 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
         snackPosition: SnackPosition.TOP,
       );
     }
+  }
+
+  // Helper functions to extract address components
+  String? _extractCityFromAddress(String address) {
+    // Try to extract city from address format like "গ্রাম: xyz, উপজেলা: abc, জেলা: city"
+    final cityMatch = RegExp(
+      r'জেলা:\s*([^,\n]+)',
+      caseSensitive: false,
+    ).firstMatch(address);
+    if (cityMatch != null) {
+      return cityMatch.group(1)?.trim();
+    }
+    // Fallback: look for common city patterns
+    if (address.toLowerCase().contains('dhaka') || address.contains('ঢাকা')) {
+      return 'Dhaka';
+    }
+    return null; // Will use default "Dhaka"
+  }
+
+  String? _extractStateFromAddress(String address) {
+    // For Bangladesh, state is typically the same as city/district
+    return _extractCityFromAddress(address);
+  }
+
+  String? _extractPostcodeFromAddress(String address) {
+    // Try to extract postcode if present in address
+    final postcodeMatch = RegExp(r'\b(\d{4})\b').firstMatch(address);
+    if (postcodeMatch != null) {
+      return postcodeMatch.group(1);
+    }
+    return null; // Will use default "1209"
   }
 }

@@ -8,7 +8,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:suborno_joyonti/app/modules/registration/views/check_registration_page.dart';
 import 'package:suborno_joyonti/services/sslcommerz_config.dart';
 
 class UpdateRegistrationPage extends StatefulWidget {
@@ -768,9 +767,11 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     final additionalGuests = currentTotalGuests - originalTotalGuests;
 
     // Calculate additional payment
-    final additionalGuestFee = additionalGuests * 500; // 500 per guest
+    final additionalGuestFee =
+        additionalGuests * 500; // 500 per guest (base amount)
     final transactionFee = (additionalGuestFee * 0.025).round();
-    final totalAdditionalAmount = additionalGuestFee + transactionFee;
+    final totalAdditionalAmountForDisplay =
+        additionalGuestFee + transactionFee; // For display to user
 
     // Show payment confirmation dialog
     final shouldProceed = await Get.dialog<bool>(
@@ -792,7 +793,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             Text('লেনদেন ফি (২.৫%): ৳$transactionFee'),
             const Divider(),
             Text(
-              'মোট অতিরিক্ত: ৳$totalAdditionalAmount',
+              'মোট অতিরিক্ত: ৳$totalAdditionalAmountForDisplay',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -828,20 +829,23 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     }
 
     // Launch SSL Commerz payment
-    await _launchAdditionalGuestPayment(totalAdditionalAmount);
+    await _launchAdditionalGuestPayment(
+      additionalGuestFee,
+      totalAdditionalAmountForDisplay,
+    );
   }
 
-  Future<void> _launchAdditionalGuestPayment(int amount) async {
+  Future<void> _launchAdditionalGuestPayment(
+    int baseAmount,
+    int displayAmount,
+  ) async {
     try {
       setState(() => isLoading = true);
 
-      // Create payment request for additional guests
-      // PaymentRequest class not available - SSLCommerzService removed
-      // final paymentRequest = PaymentRequest(...);
-
       // Store additional payment info for callback
       _pendingAdditionalPayment = {
-        'amount': amount,
+        'amount': displayAmount, // Store display amount for UI
+        'baseAmount': baseAmount, // Store base amount for calculations
         'additionalGuests':
             spouseCount +
             childCount -
@@ -850,13 +854,24 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       };
 
       // Initialize SSL Commerz and make payment request
+      // Send only base amount since SSLCommerz will add 2.5% automatically
       final sslConfig = Get.put(SSLCommerzConfig());
       await sslConfig.makePaymentRequest(
-        amount: amount.toString(),
+        amount: baseAmount.toString(), // Pay only base amount
         customerName: nameController.text.trim(),
         customerEmail: emailController.text.trim(),
         customerPhone: mobileController.text.trim(),
         customerAddress: presentAddressController.text.trim(),
+        customerCity: _extractCityFromAddress(
+          presentAddressController.text.trim(),
+        ),
+        customerState: _extractStateFromAddress(
+          presentAddressController.text.trim(),
+        ),
+        customerPostcode: _extractPostcodeFromAddress(
+          presentAddressController.text.trim(),
+        ),
+        customerCountry: nationality == 'বাংলাদেশী' ? 'Bangladesh' : 'Other',
         productName: 'Additional Guest Payment',
       );
 
@@ -870,155 +885,6 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         colorText: Colors.white,
       );
       setState(() => isLoading = false);
-    }
-  }
-
-  Future<void> _updateRegistrationAfterPayment(
-    Map<String, dynamic> paymentData,
-  ) async {
-    try {
-      final additionalGuests =
-          (spouseCount + childCount) -
-          (originalSpouseCount + originalChildCount);
-      final additionalGuestFee = additionalGuests * 500;
-      final transactionFee = (additionalGuestFee * 0.025).round();
-
-      // Get original total payable amount
-      final int originalTotalPayable =
-          widget.registrationData['totalPayable'] ?? 0;
-
-      // Handle photo upload if new photo selected
-      String? photoUrl = currentPhotoUrl;
-      if (selectedPhoto != null) {
-        try {
-          photoUrl = await _uploadPhoto(File(''));
-          if (photoUrl == null) {
-            setState(() => isLoading = false);
-            Get.snackbar(
-              'ত্রুটি',
-              'ছবি আপলোড ব্যর্থ হয়েছে',
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-            );
-            return;
-          }
-        } catch (e) {
-          print('Photo upload error: $e');
-          setState(() => isLoading = false);
-          Get.snackbar(
-            'ত্রুটি',
-            'ছবি আপলোডে সমস্যা: $e',
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-          return;
-        }
-      }
-
-      final data = {
-        'name': nameController.text.trim(),
-        'fatherName': fatherNameController.text.trim(),
-        'motherName': motherNameController.text.trim(),
-        'mobile': mobileController.text.trim(),
-        'email': emailController.text.trim(),
-        'occupation': occupationController.text.trim(),
-        'designation': designationController.text.trim(),
-        'permanentAddress': permanentAddressController.text.trim(),
-        'presentAddress': presentAddressController.text.trim(),
-        'workplaceAddress': workplaceAddressController.text.trim(),
-        'nationalId': nationalIdController.text.trim(),
-        'gender': gender,
-        'nationality': nationality,
-        'religion': religion,
-        'bloodGroup': bloodGroup,
-        'tshirtSize': tshirtSize,
-        'spouseCount': spouseCount,
-        'childCount': childCount,
-        'guestNames': guestNames,
-        'guestRelationships': guestRelationships,
-        'sscPassingYear': sscPassingYear,
-        'finalClass': finalClass,
-        'year': year,
-        'isRunningStudent': isRunningStudent,
-        'isStillStudying': isStillStudying,
-        'batch': widget.batchId,
-        'totalPayable':
-            originalTotalPayable + additionalGuestFee + transactionFee,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'additionalPayments': FieldValue.arrayUnion([
-          {
-            'type': 'additional_guest_payment',
-            'additionalGuests': additionalGuests,
-            'additionalGuestFee': additionalGuestFee,
-            'transactionFee': transactionFee,
-            'totalAmount': additionalGuestFee + transactionFee,
-            'paymentData': paymentData,
-            'paymentTimestamp': DateTime.now().toIso8601String(),
-          },
-        ]),
-        'updateHistory': FieldValue.arrayUnion([
-          {
-            'type': 'guest_count_increase_with_payment',
-            'oldSpouseCount': originalSpouseCount,
-            'newSpouseCount': spouseCount,
-            'oldChildCount': originalChildCount,
-            'newChildCount': childCount,
-            'additionalPayment': additionalGuestFee + transactionFee,
-            'timestamp': DateTime.now().toIso8601String(),
-            'paymentStatus': 'approved',
-          },
-        ]),
-      };
-
-      if (photoUrl != null) {
-        data['photoUrl'] = photoUrl;
-      }
-
-      print('Updating registration with data: $data');
-
-      await FirebaseFirestore.instance
-          .collection(CollectionConfig.batchesCollection)
-          .doc(widget.batchId)
-          .collection(CollectionConfig.registrationsCollection)
-          .doc(widget.phone)
-          .update(data);
-
-      print('Registration updated successfully');
-      setState(() => isLoading = false);
-
-      // Show success dialog after data is updated
-      // SSLCommerzService dialog removed
-
-      Get.snackbar(
-        'সফল',
-        'অতিথি সংখ্যা এবং পেমেন্ট আপডেট করা হয়েছে',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-      );
-
-      // Show a brief message about the navigation
-      Get.snackbar(
-        'সফল',
-        'অতিথি সংখ্যা আপডেট করা হয়েছে। নিবন্ধন তথ্য দেখুন।',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-      );
-
-      // Navigate to check registration page after a short delay
-      Future.delayed(const Duration(seconds: 1), () {
-        Get.offAll(() => CheckRegistrationPage());
-      });
-    } catch (e) {
-      print('Error updating registration after payment: $e');
-      setState(() => isLoading = false);
-      Get.snackbar(
-        'ত্রুটি',
-        'তথ্য আপডেট ব্যর্থ: $e',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     }
   }
 
@@ -2041,5 +1907,36 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
           ),
       ],
     );
+  }
+
+  // Helper functions to extract address components
+  String? _extractCityFromAddress(String address) {
+    // Try to extract city from address format like "গ্রাম: xyz, উপজেলা: abc, জেলা: city"
+    final cityMatch = RegExp(
+      r'জেলা:\s*([^,\n]+)',
+      caseSensitive: false,
+    ).firstMatch(address);
+    if (cityMatch != null) {
+      return cityMatch.group(1)?.trim();
+    }
+    // Fallback: look for common city patterns
+    if (address.toLowerCase().contains('dhaka') || address.contains('ঢাকা')) {
+      return 'Dhaka';
+    }
+    return null; // Will use default "Dhaka"
+  }
+
+  String? _extractStateFromAddress(String address) {
+    // For Bangladesh, state is typically the same as city/district
+    return _extractCityFromAddress(address);
+  }
+
+  String? _extractPostcodeFromAddress(String address) {
+    // Try to extract postcode if present in address
+    final postcodeMatch = RegExp(r'\b(\d{4})\b').firstMatch(address);
+    if (postcodeMatch != null) {
+      return postcodeMatch.group(1);
+    }
+    return null; // Will use default "1209"
   }
 }
