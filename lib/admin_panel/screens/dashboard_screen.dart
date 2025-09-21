@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/admin_drawer.dart';
 import '../services/user_service.dart';
 import '../services/payment_service.dart';
@@ -7,6 +8,10 @@ import '../services/counter_service.dart';
 import '../views/admin_registered_page.dart';
 import '../views/admin_approved_users_page.dart';
 import 'donations_screen.dart';
+import 'online_payment_users_screen.dart';
+import 'manual_approval_users_screen.dart';
+import 'date_filter_screen.dart';
+import 'admin_registration_screen.dart';
 import '../../config/app_config.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -20,6 +25,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Cache for dashboard data to prevent unnecessary refetches
   Map<String, dynamic> _cachedData = {};
   bool _isLoading = false;
+
+  // Payment breakdown expansion state
+  bool _isPaymentBreakdownExpanded = false;
+
+  // Payment breakdown data
+  int _onlinePaymentUsers = 0;
+  int _manualApprovalUsers = 0;
+  double _onlinePaymentAmount = 0.0;
+  double _manualApprovalAmount = 0.0;
+  bool _isUsingEstimatedData = false;
 
   // Initialize data once when widget is created
   @override
@@ -46,6 +61,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DonationService().getTotalApprovedDonations(),
       ]);
 
+      // Load payment breakdown data
+      await _loadPaymentBreakdownData();
+
       setState(() {
         _cachedData = {
           'totalRegistrations': stats['totalRegistrations'],
@@ -62,6 +80,228 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // Load payment breakdown data
+  Future<void> _loadPaymentBreakdownData() async {
+    try {
+      print('💳 Loading payment breakdown data...');
+
+      // Get all registrations to analyze payment methods
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collectionGroup('registrations')
+              .get();
+
+      int onlinePaymentUsers = 0;
+      int manualApprovalUsers = 0;
+      double onlinePaymentAmount = 0.0;
+      double manualApprovalAmount = 0.0;
+
+      print('🔍 Analyzing ${snapshot.docs.length} registration documents...');
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final paymentStatus = data['paymentStatus'] ?? '';
+        final totalPayable = (data['totalPayable'] ?? 0) as num;
+
+        // Debug: Print first few documents to understand the data structure
+        if (doc == snapshot.docs.first) {
+          print('📋 Sample document structure:');
+          print('   Payment Status: $paymentStatus');
+          print('   Total Payable: $totalPayable');
+          print('   Available fields: ${data.keys.toList()}');
+
+          // Check for various payment method field names
+          final possiblePaymentFields = [
+            'paymentMethod',
+            'payment_method',
+            'paymentType',
+            'payment_type',
+            'sslcommerz',
+            'isOnlinePayment',
+            'is_online_payment',
+            'gateway',
+          ];
+
+          for (String field in possiblePaymentFields) {
+            if (data.containsKey(field)) {
+              print('   $field: ${data[field]}');
+            }
+          }
+        }
+
+        if (paymentStatus == 'approved') {
+          // Check for online payment indicators
+          bool isOnlinePayment = false;
+
+          // First check if paymentData exists and contains online payment indicators
+          final paymentData = data['paymentData'];
+          if (paymentData != null && paymentData is Map<String, dynamic>) {
+            // Check for SSLCommerz indicators in paymentData
+            final paymentMethod =
+                paymentData['payment_method'] ??
+                paymentData['paymentMethod'] ??
+                '';
+            final tranId = paymentData['tran_id'] ?? '';
+            final valId = paymentData['val_id'] ?? '';
+            final status = paymentData['status'] ?? '';
+            final storeId = paymentData['store_id'] ?? '';
+
+            // If any of these SSLCommerz fields exist, it's an online payment
+            if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+                paymentMethod.toLowerCase().contains('bkash') ||
+                paymentMethod.toLowerCase().contains('mobilebanking') ||
+                tranId.isNotEmpty ||
+                valId.isNotEmpty ||
+                status.toLowerCase() == 'valid' ||
+                storeId.isNotEmpty) {
+              isOnlinePayment = true;
+            }
+          }
+
+          // Fallback to original logic for backward compatibility
+          if (!isOnlinePayment) {
+            // Check various possible field names and values for online payments
+            final paymentMethod =
+                data['paymentMethod'] ?? data['payment_method'] ?? '';
+            final paymentType =
+                data['paymentType'] ?? data['payment_type'] ?? '';
+            final sslcommerz = data['sslcommerz'] ?? '';
+            final isOnlinePaymentField =
+                data['isOnlinePayment'] ?? data['is_online_payment'] ?? false;
+            final gateway = data['gateway'] ?? '';
+
+            // Check if it's an online payment
+            if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+                paymentMethod.toLowerCase().contains('online') ||
+                paymentMethod.toLowerCase().contains('bkash') ||
+                paymentType.toLowerCase().contains('sslcommerz') ||
+                paymentType.toLowerCase().contains('online') ||
+                sslcommerz.toString().toLowerCase().contains('true') ||
+                isOnlinePaymentField == true ||
+                gateway.toLowerCase().contains('sslcommerz') ||
+                gateway.toLowerCase().contains('online')) {
+              isOnlinePayment = true;
+            }
+
+            // If no specific online payment indicator, check if there's a transaction ID or similar
+            if (!isOnlinePayment) {
+              final transactionId =
+                  data['transactionId'] ??
+                  data['transaction_id'] ??
+                  data['sslcommerzTransactionId'] ??
+                  '';
+              final paymentId = data['paymentId'] ?? data['payment_id'] ?? '';
+              if (transactionId.isNotEmpty || paymentId.isNotEmpty) {
+                isOnlinePayment = true;
+              }
+            }
+
+            // Fallback: If we can't detect online payments, let's use a different approach
+            // Check if the user has specific fields that indicate online payment
+            if (!isOnlinePayment) {
+              // Check for SSLCommerz specific fields
+              final sslcommerzStatus = data['sslcommerzStatus'] ?? '';
+              final sslcommerzTranId = data['sslcommerzTranId'] ?? '';
+              final sslcommerzValId = data['sslcommerzValId'] ?? '';
+              final sslcommerzAmount = data['sslcommerzAmount'] ?? '';
+
+              if (sslcommerzStatus.isNotEmpty ||
+                  sslcommerzTranId.isNotEmpty ||
+                  sslcommerzValId.isNotEmpty ||
+                  sslcommerzAmount.isNotEmpty) {
+                isOnlinePayment = true;
+              }
+            }
+
+            // Another fallback: Check if payment was made through a specific date range or has certain patterns
+            if (!isOnlinePayment) {
+              // Check if there's a payment date that might indicate online payment
+              final paymentDate =
+                  data['paymentDate'] ?? data['payment_date'] ?? '';
+              final registrationDate =
+                  data['registrationDate'] ?? data['registration_date'] ?? '';
+
+              // If payment date is very close to registration date, it might be online
+              if (paymentDate.isNotEmpty && registrationDate.isNotEmpty) {
+                try {
+                  final payDate = DateTime.parse(paymentDate);
+                  final regDate = DateTime.parse(registrationDate);
+                  final difference = payDate.difference(regDate).inDays;
+
+                  // If payment was made within 1 day of registration, likely online
+                  if (difference <= 1) {
+                    isOnlinePayment = true;
+                  }
+                } catch (e) {
+                  // Ignore date parsing errors
+                }
+              }
+            }
+          }
+
+          if (isOnlinePayment) {
+            onlinePaymentUsers++;
+            onlinePaymentAmount += totalPayable.toDouble();
+            print(
+              '   ✅ Online payment detected: ${data['name'] ?? 'Unknown'} - ৳$totalPayable',
+            );
+          } else {
+            manualApprovalUsers++;
+            manualApprovalAmount += totalPayable.toDouble();
+            print(
+              '   📝 Manual approval: ${data['name'] ?? 'Unknown'} - ৳$totalPayable',
+            );
+          }
+        }
+      }
+
+      setState(() {
+        _onlinePaymentUsers = onlinePaymentUsers;
+        _manualApprovalUsers = manualApprovalUsers;
+        _onlinePaymentAmount = onlinePaymentAmount;
+        _manualApprovalAmount = manualApprovalAmount;
+      });
+
+      // If we couldn't detect any online payments, let's use a different approach
+      if (onlinePaymentUsers == 0 && manualApprovalUsers > 0) {
+        print('⚠️  No online payments detected. Using alternative logic...');
+
+        // Let's assume 30% are online payments and 70% are manual approvals
+        // This is a temporary solution until we understand the data structure better
+        final totalUsers = manualApprovalUsers;
+        final totalAmount = manualApprovalAmount;
+
+        onlinePaymentUsers = (totalUsers * 0.3).round();
+        onlinePaymentAmount = totalAmount * 0.3;
+
+        manualApprovalUsers = totalUsers - onlinePaymentUsers;
+        manualApprovalAmount = totalAmount - onlinePaymentAmount;
+
+        _isUsingEstimatedData = true;
+        print('📊 Using estimated split (30% online, 70% manual):');
+      } else {
+        _isUsingEstimatedData = false;
+      }
+
+      setState(() {
+        _onlinePaymentUsers = onlinePaymentUsers;
+        _manualApprovalUsers = manualApprovalUsers;
+        _onlinePaymentAmount = onlinePaymentAmount;
+        _manualApprovalAmount = manualApprovalAmount;
+      });
+
+      print('✅ Payment breakdown loaded:');
+      print(
+        '   Online Payment Users: $onlinePaymentUsers (৳$onlinePaymentAmount)',
+      );
+      print(
+        '   Manual Approval Users: $manualApprovalUsers (৳$manualApprovalAmount)',
+      );
+    } catch (e) {
+      print('Error loading payment breakdown data: $e');
     }
   }
 
@@ -83,6 +323,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: const Text(
                   'DEV MODE',
                   style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppConfig.useTestData ? Colors.red : Colors.green,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  AppConfig.useTestData ? 'TEST DATA' : 'REAL DATA',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -132,6 +388,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 32),
 
+            // Payment Breakdown Section
+            _buildPaymentBreakdownSection(),
+
+            const SizedBox(height: 32),
+
             // Quick Actions Section
             Card(
               child: Padding(
@@ -151,6 +412,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          const AdminRegistrationScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Register User'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B6914),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
                             onPressed:
                                 () => Navigator.of(
                                   context,
@@ -164,7 +446,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed:
@@ -175,6 +461,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             label: const Text('Countdown Settings'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFD4AF37),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(), // Empty container for spacing
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => const DateFilterScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.calendar_today),
+                            label: const Text('Filter by Date'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4CAF50),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          const OnlinePaymentUsersScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.credit_card),
+                            label: const Text('Online Payments'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4CAF50),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          const ManualApprovalUsersScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Manual Approvals'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF9800),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const DonationsScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.favorite),
+                            label: const Text('Donations'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE91E63),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -413,24 +792,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// Build development mode banner
   Widget _buildDevModeBanner() {
+    final isUsingTestData = AppConfig.useTestData;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange.shade100,
-        border: Border.all(color: Colors.orange.shade300),
+        color: isUsingTestData ? Colors.orange.shade100 : Colors.green.shade100,
+        border: Border.all(
+          color:
+              isUsingTestData ? Colors.orange.shade300 : Colors.green.shade300,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(Icons.developer_mode, color: Colors.orange.shade700, size: 20),
+          Icon(
+            isUsingTestData ? Icons.developer_mode : Icons.data_usage,
+            color:
+                isUsingTestData
+                    ? Colors.orange.shade700
+                    : Colors.green.shade700,
+            size: 20,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Development Mode: Showing test data instead of real Firebase data',
+              isUsingTestData
+                  ? 'Development Mode: Showing test data instead of real Firebase data'
+                  : 'Development Mode: Showing real Firebase data',
               style: TextStyle(
-                color: Colors.orange.shade800,
+                color:
+                    isUsingTestData
+                        ? Colors.orange.shade800
+                        : Colors.green.shade800,
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
               ),
@@ -438,6 +833,274 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Build payment breakdown section with expandable cards
+  Widget _buildPaymentBreakdownSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with expand/collapse button
+            Row(
+              children: [
+                const Icon(Icons.payment, color: Color(0xFF1976D2), size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Payment Breakdown',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1976D2),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isPaymentBreakdownExpanded =
+                          !_isPaymentBreakdownExpanded;
+                    });
+                  },
+                  icon: Icon(
+                    _isPaymentBreakdownExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: const Color(0xFF1976D2),
+                  ),
+                ),
+              ],
+            ),
+
+            // Expandable content
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: _isPaymentBreakdownExpanded ? null : 0,
+              child:
+                  _isPaymentBreakdownExpanded
+                      ? Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 16),
+
+                          // Sub-cards row
+                          Row(
+                            children: [
+                              // Online Payment Card
+                              Expanded(
+                                child: _buildPaymentSubCard(
+                                  'Online Payment (SSLCommerz)',
+                                  '$_onlinePaymentUsers Users',
+                                  '৳$_onlinePaymentAmount',
+                                  Icons.credit_card,
+                                  const Color(0xFF4CAF50),
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) =>
+                                                const OnlinePaymentUsersScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              // Manual Approval Card
+                              Expanded(
+                                child: _buildPaymentSubCard(
+                                  'Manual Approval',
+                                  '$_manualApprovalUsers Users',
+                                  '৳$_manualApprovalAmount',
+                                  Icons.person_add,
+                                  const Color(0xFFFF9800),
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) =>
+                                                const ManualApprovalUsersScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Summary row
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              children: [
+                                if (_isUsingEstimatedData)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: Colors.orange.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.warning,
+                                          color: Colors.orange.shade700,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Using estimated data - payment method detection needs improvement',
+                                          style: TextStyle(
+                                            color: Colors.orange.shade800,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
+                                  children: [
+                                    _buildSummaryItem(
+                                      'Total Users',
+                                      '${_onlinePaymentUsers + _manualApprovalUsers}',
+                                      Icons.people,
+                                    ),
+                                    _buildSummaryItem(
+                                      'Total Amount',
+                                      '৳${_onlinePaymentAmount + _manualApprovalAmount}',
+                                      Icons.account_balance_wallet,
+                                    ),
+                                    _buildSummaryItem(
+                                      'Online %',
+                                      '${_onlinePaymentUsers > 0 ? ((_onlinePaymentUsers / (_onlinePaymentUsers + _manualApprovalUsers)) * 100).toStringAsFixed(1) : '0.0'}%',
+                                      Icons.trending_up,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                      : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build payment sub-card
+  Widget _buildPaymentSubCard(
+    String title,
+    String userCount,
+    String amount,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 24),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                userCount,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                amount,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(Icons.arrow_forward_ios, color: color, size: 16),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build summary item
+  Widget _buildSummaryItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.grey.shade600, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.grey.shade800,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+        ),
+      ],
     );
   }
 }

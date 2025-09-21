@@ -36,6 +36,9 @@ class RegistrationController extends GetxController {
   final mobileController = TextEditingController();
   final emailController = TextEditingController();
 
+  // Guest name controllers
+  final List<TextEditingController> guestNameControllers = [];
+
   // Reactive fields
   var selectedGender = 'পুরুষ'.obs;
   var selectedReligion = 'ইসলাম'.obs;
@@ -58,6 +61,7 @@ class RegistrationController extends GetxController {
   var isStillStudying = false.obs;
   var selectedTshirtSize = RxnString();
   var selectedBloodGroup = ''.obs;
+  var isQuickRegistration = false.obs;
 
   // Dropdown lists
   final List<String> tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -259,6 +263,10 @@ class RegistrationController extends GetxController {
     nationalIdController.dispose();
     mobileController.dispose();
     emailController.dispose();
+    // Dispose guest name controllers
+    for (var controller in guestNameControllers) {
+      controller.dispose();
+    }
     super.onClose();
   }
 
@@ -460,7 +468,11 @@ class RegistrationController extends GetxController {
   }
 
   /// Launch payment flow for registration
-  Future<void> launchRegistrationPayment() async {
+  Future<void> launchRegistrationPayment({
+    bool isQuickRegistration = false,
+  }) async {
+    // Set the quick registration flag
+    this.isQuickRegistration.value = isQuickRegistration;
     // Validate form first
     if (!formKey.currentState!.validate()) {
       Get.snackbar(
@@ -472,8 +484,8 @@ class RegistrationController extends GetxController {
       return;
     }
 
-    // Validate photo upload
-    if (selectedPhoto.value == null) {
+    // Validate photo upload only if not quick registration
+    if (!isQuickRegistration && selectedPhoto.value == null) {
       photoError.value = 'ছবি আপলোড করা বাধ্যতামূলক';
       Get.snackbar(
         'ত্রুটি',
@@ -514,17 +526,39 @@ class RegistrationController extends GetxController {
     // Validate guest names if guests are added
     final totalGuests = spouseCount.value + childCount.value;
     if (totalGuests > 0) {
+      print(
+        '🔍 Guest Validation: totalGuests=$totalGuests, guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
+
+      // Ensure guest names list and controllers are properly initialized
+      while (guestNames.length < totalGuests) {
+        guestNames.add('');
+      }
+      while (guestNameControllers.length < totalGuests) {
+        guestNameControllers.add(TextEditingController());
+      }
+
+      print(
+        '🔍 After initialization: guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
+
       for (int i = 0; i < totalGuests; i++) {
-        if (i < guestNames.length && guestNames[i].trim().isEmpty) {
+        final guestName = guestNameControllers[i].text.trim();
+        print(
+          '🔍 Checking guest $i: controller text="$guestName", isEmpty=${guestName.isEmpty}',
+        );
+        if (guestName.isEmpty) {
+          print('🔍 Validation failed for guest $i - name is empty');
           Get.snackbar(
             'ত্রুটি',
-            'অনুগ্রহ করে সব অতিথির নাম পূরণ করুন',
+            'অনুগ্রহ করে অতিথি ${i + 1} এর নাম পূরণ করুন',
             backgroundColor: Colors.redAccent,
             colorText: Colors.white,
           );
           return;
         }
       }
+      print('🔍 All guest names validated successfully');
     }
 
     final batch =
@@ -565,9 +599,23 @@ class RegistrationController extends GetxController {
     final registrationData = _collectRegistrationData(batch);
     final baseAmount = registrationData['totalPayable'] as int;
 
+    // Debug: Print the calculated amount
+    print('🔍 Payment Debug:');
+    print('  - Batch: $batch');
+    print('  - Is Running Student: $isRunning');
+    print('  - Selected Final Class: ${selectedFinalClass.value}');
+    print('  - Selected SSC Year: ${selectedSscPassingYear.value}');
+    print('  - Spouse Count: ${spouseCount.value}');
+    print('  - Child Count: ${childCount.value}');
+    print('  - Base Amount: $baseAmount');
+
     // Add 2.5% transaction charge (for display only - SSLCommerz adds this automatically)
     final transactionFee = (baseAmount * 0.025).round();
     final totalAmountForDisplay = baseAmount + transactionFee;
+
+    print('  - Transaction Fee: $transactionFee');
+    print('  - Total for Display: $totalAmountForDisplay');
+    print('  - Amount sent to SSL Commerz: $baseAmount');
 
     // Update registration data with transaction fee details
     registrationData['baseAmount'] = baseAmount;
@@ -635,17 +683,39 @@ class RegistrationController extends GetxController {
     // Validate guest names if guests are added
     final totalGuests = spouseCount.value + childCount.value;
     if (totalGuests > 0) {
+      print(
+        '🔍 Guest Validation: totalGuests=$totalGuests, guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
+
+      // Ensure guest names list and controllers are properly initialized
+      while (guestNames.length < totalGuests) {
+        guestNames.add('');
+      }
+      while (guestNameControllers.length < totalGuests) {
+        guestNameControllers.add(TextEditingController());
+      }
+
+      print(
+        '🔍 After initialization: guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
+
       for (int i = 0; i < totalGuests; i++) {
-        if (i < guestNames.length && guestNames[i].trim().isEmpty) {
+        final guestName = guestNameControllers[i].text.trim();
+        print(
+          '🔍 Checking guest $i: controller text="$guestName", isEmpty=${guestName.isEmpty}',
+        );
+        if (guestName.isEmpty) {
+          print('🔍 Validation failed for guest $i - name is empty');
           Get.snackbar(
             'ত্রুটি',
-            'অনুগ্রহ করে সব অতিথির নাম পূরণ করুন',
+            'অনুগ্রহ করে অতিথি ${i + 1} এর নাম পূরণ করুন',
             backgroundColor: Colors.redAccent,
             colorText: Colors.white,
           );
           return;
         }
       }
+      print('🔍 All guest names validated successfully');
     }
 
     final batch =
@@ -839,8 +909,9 @@ class RegistrationController extends GetxController {
 
   /// Save registration with payment details after successful payment
   Future<void> saveRegistrationWithPayment(
-    Map<String, dynamic> paymentData,
-  ) async {
+    Map<String, dynamic> paymentData, {
+    bool isQuickRegistration = false,
+  }) async {
     try {
       isLoading.value = true;
 
@@ -896,8 +967,8 @@ class RegistrationController extends GetxController {
         name: 'registration_loading',
       );
 
-      // Validate photo upload
-      if (selectedPhoto.value == null) {
+      // Validate photo upload only if not quick registration
+      if (!isQuickRegistration && selectedPhoto.value == null) {
         Get.back(); // Close loading dialog
         photoError.value = 'ছবি আপলোড করা বাধ্যতামূলক';
         Get.snackbar(
@@ -914,42 +985,48 @@ class RegistrationController extends GetxController {
           isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
       final phone = mobileController.text.trim();
 
-      // Upload photo first
+      // Upload photo first (only if photo is provided)
       String? photoUrl;
-      try {
-        if (!kIsWeb &&
-            selectedPhoto.value!.path != null &&
-            selectedPhoto.value!.path!.isNotEmpty) {
-          photoUrl = await uploadPhoto(File(selectedPhoto.value!.path!));
-        } else {
-          photoUrl = await uploadPhoto(File(''));
+      if (selectedPhoto.value != null) {
+        try {
+          if (!kIsWeb &&
+              selectedPhoto.value!.path != null &&
+              selectedPhoto.value!.path!.isNotEmpty) {
+            photoUrl = await uploadPhoto(File(selectedPhoto.value!.path!));
+          } else {
+            photoUrl = await uploadPhoto(File(''));
+          }
+          if (photoUrl == null && !isQuickRegistration) {
+            Get.back(); // Dismiss loading
+            Get.snackbar(
+              'ছবি আপলোড ব্যর্থ',
+              'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            return;
+          }
+        } catch (e) {
+          if (!isQuickRegistration) {
+            Get.back(); // Dismiss loading
+            Get.snackbar(
+              'ছবি আপলোড ব্যর্থ',
+              'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
+              backgroundColor: Colors.redAccent,
+              colorText: Colors.white,
+            );
+            return;
+          }
         }
-        if (photoUrl == null) {
-          Get.back(); // Dismiss loading
-          Get.snackbar(
-            'ছবি আপলোড ব্যর্থ',
-            'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
-            backgroundColor: Colors.redAccent,
-            colorText: Colors.white,
-          );
-          return;
-        }
-      } catch (e) {
-        Get.back(); // Dismiss loading
-        Get.snackbar(
-          'ছবি আপলোড ব্যর্থ',
-          'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।',
-          backgroundColor: Colors.redAccent,
-          colorText: Colors.white,
-        );
-        return;
       }
 
       // Collect registration data
       final registrationData = _collectRegistrationData(batch);
 
-      // Add photo URL
-      registrationData['photoUrl'] = photoUrl;
+      // Add photo URL (only if photo was uploaded)
+      if (photoUrl != null) {
+        registrationData['photoUrl'] = photoUrl;
+      }
 
       // Add payment information
       registrationData['paymentStatus'] = 'approved';
@@ -1146,7 +1223,10 @@ class RegistrationController extends GetxController {
       'registrationTimestamp': DateTime.now().toIso8601String(),
       'totalPayable': totalPayable,
       'paymentStatus': 'pending',
-      'guestNames': guestNames.toList(),
+      'guestNames':
+          guestNameControllers
+              .map((controller) => controller.text.trim())
+              .toList(),
       'guestRelationships': guestRelationships.toList(),
     };
   }
@@ -1181,6 +1261,48 @@ class RegistrationController extends GetxController {
     photoError.value = null;
     selectedPhoto.value = null;
 
+    // Note: Guest details are managed separately and should not be cleared here
+    // _initializeGuestDetails(); // Removed to preserve user-entered guest names
+  }
+
+  // Fill demo data for quick registration (only fills non-required fields)
+  void fillQuickRegistrationDemoData() {
+    // Only fill fields that are not required for quick registration
+    // DO NOT override user selections for pricing-related fields
+    fatherNameController.text = 'ডেমো পিতা';
+    motherNameController.text = 'ডেমো মাতা';
+    permanentAddressController.text = 'ডেমো ঠিকানা';
+    presentAddressController.text = 'ডেমো বর্তমান ঠিকানা';
+    occupationController.text = 'ডেমো পেশা';
+    designationController.text = 'ডেমো পদবী';
+    workplaceAddressController.text = 'ডেমো কর্মস্থল';
+    nationalIdController.text = '1234567890123';
+    emailController.text = 'demo@example.com';
+    selectedGender.value = 'পুরুষ';
+    selectedBloodGroup.value = 'A+';
+    selectedReligion.value = 'ইসলাম';
+    selectedNationality.value = 'বাংলাদেশী';
+    selectedYear.value = '2024';
+
+    // DO NOT override user's batch/student type selections
+    // Only set defaults if they are empty
+    if (selectedSscPassingYear.value.isEmpty ||
+        selectedSscPassingYear.value == 'None') {
+      selectedSscPassingYear.value = '2020';
+    }
+    if (selectedFinalClass.value.isEmpty) {
+      selectedFinalClass.value = '১০ম শ্রেণি';
+    }
+
+    // DO NOT override user's guest count selections
+    // Keep current values
+
+    selectedTshirtSize.value = 'M';
+    // DO NOT override isRunningStudent - keep user's selection
+    isStillStudying.value = false;
+    photoError.value = null;
+    selectedPhoto.value = null;
+
     // Initialize guest details for demo
     _initializeGuestDetails();
   }
@@ -1197,22 +1319,59 @@ class RegistrationController extends GetxController {
     }
   }
 
+  // Reset form for quick registration
+  void resetForQuickRegistration() {
+    // Clear all fields
+    nameController.clear();
+    mobileController.clear();
+    selectedDateOfBirth.value = null;
+    selectedSscPassingYear.value = '';
+    selectedFinalClass.value = '';
+
+    // Set default values for dropdowns
+    selectedSscPassingYear.value = '2020';
+    selectedFinalClass.value = '১০ম শ্রেণি';
+    isRunningStudent.value = false;
+  }
+
   // Update guest details when count changes
   void updateGuestDetails() {
     final totalGuests = spouseCount.value + childCount.value;
+
+    print(
+      '🔍 updateGuestDetails: totalGuests=$totalGuests, current guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+    );
+    print('🔍 Current guest names before update: $guestNames');
 
     // If adding guests
     if (guestNames.length < totalGuests) {
       for (int i = guestNames.length; i < totalGuests; i++) {
         guestNames.add('');
         guestRelationships.add('স্বামী'); // Default relationship
+        guestNameControllers.add(TextEditingController());
       }
+      print(
+        '🔍 Added guests: new guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
     }
     // If removing guests
     else if (guestNames.length > totalGuests) {
       guestNames.removeRange(totalGuests, guestNames.length);
       guestRelationships.removeRange(totalGuests, guestRelationships.length);
+      // Dispose and remove controllers for removed guests
+      for (int i = totalGuests; i < guestNameControllers.length; i++) {
+        guestNameControllers[i].dispose();
+      }
+      guestNameControllers.removeRange(
+        totalGuests,
+        guestNameControllers.length,
+      );
+      print(
+        '🔍 Removed guests: new guestNames.length=${guestNames.length}, controllers.length=${guestNameControllers.length}',
+      );
     }
+
+    print('🔍 Final guest names after update: $guestNames');
   }
 
   // Test PDF generation method

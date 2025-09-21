@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/payment_service.dart';
+import '../widgets/payment_approval_dialog.dart';
 
 class AdminRegisteredPage extends StatelessWidget {
   const AdminRegisteredPage({super.key});
@@ -791,18 +792,23 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
                   if (payment!['status'] == 'pending') ...[
                     ElevatedButton.icon(
                       icon: const Icon(Icons.check, color: Colors.white),
-                      label: const Text('Approve'),
+                      label: const Text('Approve Payment'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                       ),
-                      onPressed: () async {
-                        await PaymentService().updatePaymentStatus(
-                          payment!['id'],
-                          'approved',
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder:
+                              (context) => PaymentApprovalDialog(
+                                userData: widget.userData,
+                                onApproved: () {
+                                  setState(() {
+                                    payment!['status'] = 'approved';
+                                  });
+                                },
+                              ),
                         );
-                        setState(() {
-                          payment!['status'] = 'approved';
-                        });
                       },
                     ),
                     const SizedBox(width: 8),
@@ -944,7 +950,6 @@ class _AdminUserDetailsDialogState extends State<AdminUserDetailsDialog> {
 
   void _updateTotalPayable() {
     // Calculate total payable amount based on current editedUser data
-    final bool isRunning = editedUser['isRunningStudent'] == true;
     final int baseFee = _calculateBaseFee(editedUser);
     final int guestCount =
         (editedUser['spouseCount'] ?? 0) + (editedUser['childCount'] ?? 0);

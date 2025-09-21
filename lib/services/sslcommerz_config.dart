@@ -63,7 +63,7 @@ class SSLCommerzConfig extends GetxController {
 
   /// Your custom proxy API endpoint (current setup)
   static String get proxyApiEndpoint {
-    return "https://jubilee.jahajmarahighschool.com/api/index.php";
+    return "https://jubilee.jahajmarahighschool.com/api/ssl/index.php";
   }
 
   /// Use proxy API (true) or direct SSL Commerz API (false)
@@ -115,11 +115,11 @@ class SSLCommerzConfig extends GetxController {
         "currency": currency,
         "tran_id": tranId,
         "success_url":
-            "https://jubilee.jahajmarahighschool.com/api/payment-success.php",
+            "https://jubilee.jahajmarahighschool.com/api/ssl/payment-success.php",
         "fail_url":
-            "https://jubilee.jahajmarahighschool.com/api/payment-fail.php",
+            "https://jubilee.jahajmarahighschool.com/api/ssl/payment-fail.php",
         "cancel_url":
-            "https://jubilee.jahajmarahighschool.com/api/payment-cancel.php",
+            "https://jubilee.jahajmarahighschool.com/api/ssl/payment-cancel.php",
         // Customer info
         'cus_name': customerName,
         'cus_email': customerEmail,
@@ -292,7 +292,7 @@ class SSLCommerzConfig extends GetxController {
       // This is a simple approach - in production you'd check with your specific transaction ID
       final response = await http.get(
         Uri.parse(
-          'https://jubilee.jahajmarahighschool.com/api/payment-status.php?tran_id=${transactionId.value}',
+          'https://jubilee.jahajmarahighschool.com/api/ssl/payment-status.php?tran_id=${transactionId.value}',
         ),
       );
 
@@ -325,7 +325,10 @@ class SSLCommerzConfig extends GetxController {
       // Try to find registration controller (for new registrations)
       try {
         final registrationController = Get.find<RegistrationController>();
-        await registrationController.saveRegistrationWithPayment(paymentData);
+        await registrationController.saveRegistrationWithPayment(
+          paymentData,
+          isQuickRegistration: registrationController.isQuickRegistration.value,
+        );
         print('✅ New registration with payment saved successfully');
         return;
       } catch (e) {

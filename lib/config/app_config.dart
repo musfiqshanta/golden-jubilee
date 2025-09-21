@@ -1,4 +1,3 @@
-
 /// Application Configuration
 /// Handles environment-specific settings and development mode detection
 class AppConfig {
@@ -17,16 +16,13 @@ class AppConfig {
     return !isDevelopment;
   }
 
-  /// Manual development mode override (set to true for testing)
-  static const bool _isDevelopmentEnvironment =
-      true; // Set to false for production
-
   // ============================================================================
   // DEVELOPMENT MODE SETTINGS
   // ============================================================================
 
   /// Show test data instead of real Firebase data in development mode
-  static bool get useTestData => isDevelopment;
+  /// Set to false to use real data in admin dashboard
+  static bool get useTestData => false; // Changed to false to show real data
 
   /// Show development mode indicator in UI
   static bool get showDevModeIndicator => isDevelopment;
@@ -140,6 +136,9 @@ class AppConfig {
     print('   Use Test Data: $useTestData');
     print('   Show Dev Indicator: $showDevModeIndicator');
     print('   Use Mock Payments: $useMockPayments');
+    print(
+      '   📊 Admin Dashboard: ${useTestData ? "Showing TEST DATA" : "Showing REAL DATA"}',
+    );
   }
 
   /// Test method to verify configuration is working

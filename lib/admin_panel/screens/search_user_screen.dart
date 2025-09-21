@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/admin_drawer.dart';
 import '../views/admin_registered_page.dart';
+import '../widgets/payment_approval_dialog.dart';
 
 class SearchUserScreen extends StatefulWidget {
   const SearchUserScreen({super.key});
@@ -12,22 +12,23 @@ class SearchUserScreen extends StatefulWidget {
 }
 
 class _SearchUserScreenState extends State<SearchUserScreen> {
-  final _phoneController = TextEditingController();
+  final _searchController = TextEditingController();
   bool _isLoading = false;
   Map<String, dynamic>? _searchResult;
   String? _errorMessage;
+  String _searchType = 'phone'; // 'phone' or 'form'
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _searchUser() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
+    final searchQuery = _searchController.text.trim();
+    if (searchQuery.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter a phone number';
+        _errorMessage = 'Please enter a search term';
         _searchResult = null;
       });
       return;
@@ -40,73 +41,124 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     });
 
     try {
-      print('Searching for phone: $phone');
+      print('Searching for $_searchType: $searchQuery');
 
-      // Search across all batches using collectionGroup query
-      final registrationsSnapshot =
-          await FirebaseFirestore.instance
-              .collectionGroup('registrations')
-              .where('mobile', isEqualTo: phone)
-              .get();
-
-      print('Found ${registrationsSnapshot.docs.length} registrations');
-
-      if (registrationsSnapshot.docs.isNotEmpty) {
-        final registrationDoc = registrationsSnapshot.docs.first;
-        final userData = registrationDoc.data();
-
-        // Get the batch ID from the document path
-        final batchId = registrationDoc.reference.parent.parent?.id;
-        userData['batch'] = batchId;
-        userData['id'] = registrationDoc.id;
-
-        print('Found user: ${userData['name']} in batch: $batchId');
-
-        setState(() {
-          _searchResult = userData;
-          _isLoading = false;
-        });
+      if (_searchType == 'phone') {
+        await _searchByPhone(searchQuery);
       } else {
-        // If not found, try alternative search methods
-        print('No exact match found, trying alternative search...');
-
-        // Search by partial phone number match
-        final allRegistrations =
-            await FirebaseFirestore.instance
-                .collectionGroup('registrations')
-                .get();
-
-        for (var doc in allRegistrations.docs) {
-          final data = doc.data();
-          final userPhone = data['mobile']?.toString() ?? '';
-
-          if (userPhone.contains(phone) || phone.contains(userPhone)) {
-            final batchId = doc.reference.parent.parent?.id;
-            data['batch'] = batchId;
-            data['id'] = doc.id;
-
-            print(
-              'Found partial match: ${data['name']} with phone: $userPhone',
-            );
-
-            setState(() {
-              _searchResult = data;
-              _isLoading = false;
-            });
-            return;
-          }
-        }
-
-        // If still not found
-        setState(() {
-          _errorMessage = 'No user found with this phone number';
-          _isLoading = false;
-        });
+        await _searchByFormNumber(searchQuery);
       }
     } catch (e) {
       print('Search error: $e');
       setState(() {
         _errorMessage = 'Error searching for user: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _searchByPhone(String phone) async {
+    // Search across all batches using collectionGroup query
+    final registrationsSnapshot =
+        await FirebaseFirestore.instance
+            .collectionGroup('registrations')
+            .where('mobile', isEqualTo: phone)
+            .get();
+
+    print('Found ${registrationsSnapshot.docs.length} registrations');
+
+    if (registrationsSnapshot.docs.isNotEmpty) {
+      final registrationDoc = registrationsSnapshot.docs.first;
+      final userData = registrationDoc.data();
+
+      // Get the batch ID from the document path
+      final batchId = registrationDoc.reference.parent.parent?.id;
+      userData['batch'] = batchId;
+      userData['id'] = registrationDoc.id;
+
+      print('Found user: ${userData['name']} in batch: $batchId');
+
+      setState(() {
+        _searchResult = userData;
+        _isLoading = false;
+      });
+    } else {
+      // If not found, try alternative search methods
+      print('No exact match found, trying alternative search...');
+
+      // Search by partial phone number match
+      final allRegistrations =
+          await FirebaseFirestore.instance
+              .collectionGroup('registrations')
+              .get();
+
+      for (var doc in allRegistrations.docs) {
+        final data = doc.data();
+        final userPhone = data['mobile']?.toString() ?? '';
+
+        if (userPhone.contains(phone) || phone.contains(userPhone)) {
+          final batchId = doc.reference.parent.parent?.id;
+          data['batch'] = batchId;
+          data['id'] = doc.id;
+
+          print('Found partial match: ${data['name']} with phone: $userPhone');
+
+          setState(() {
+            _searchResult = data;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // If still not found
+      setState(() {
+        _errorMessage = 'No user found with this phone number';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _searchByFormNumber(String formNumber) async {
+    // Convert form number to integer for comparison
+    final formNum = int.tryParse(formNumber);
+    if (formNum == null) {
+      setState(() {
+        _errorMessage = 'Please enter a valid form number';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Search across all batches using collectionGroup query
+    final registrationsSnapshot =
+        await FirebaseFirestore.instance
+            .collectionGroup('registrations')
+            .where('formSerialNumber', isEqualTo: formNum)
+            .get();
+
+    print(
+      'Found ${registrationsSnapshot.docs.length} registrations for form number: $formNum',
+    );
+
+    if (registrationsSnapshot.docs.isNotEmpty) {
+      final registrationDoc = registrationsSnapshot.docs.first;
+      final userData = registrationDoc.data();
+
+      // Get the batch ID from the document path
+      final batchId = registrationDoc.reference.parent.parent?.id;
+      userData['batch'] = batchId;
+      userData['id'] = registrationDoc.id;
+
+      print('Found user: ${userData['name']} with form number: $formNum');
+
+      setState(() {
+        _searchResult = userData;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _errorMessage = 'No user found with form number: $formNumber';
         _isLoading = false;
       });
     }
@@ -130,169 +182,13 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
         foregroundColor: Colors.white,
       ),
       drawer: const AdminDrawer(selectedRoute: '/admin/search-user'),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Search Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Search User by Phone Number',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1976D2),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _phoneController,
-                            decoration: const InputDecoration(
-                              labelText: 'Phone Number',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.phone),
-                            ),
-                            keyboardType: TextInputType.phone,
-                            onFieldSubmitted: (_) => _searchUser(),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _searchUser,
-                          icon:
-                              _isLoading
-                                  ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                  : const Icon(Icons.search),
-                          label: Text(_isLoading ? 'Searching...' : 'Search'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1976D2),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Error Message
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error, color: Colors.red.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // Search Results
-            if (_searchResult != null) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'User Information',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1976D2),
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: _viewUserDetails,
-                            icon: const Icon(Icons.visibility),
-                            label: const Text('View Details'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1976D2),
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInfoRow('Name', _searchResult!['name'] ?? 'N/A'),
-                      _buildInfoRow(
-                        'Mobile',
-                        _searchResult!['mobile'] ?? 'N/A',
-                      ),
-                      _buildInfoRow('Email', _searchResult!['email'] ?? 'N/A'),
-                      _buildInfoRow('Batch', _searchResult!['batch'] ?? 'N/A'),
-                      _buildInfoRow(
-                        'Student Type',
-                        _searchResult!['isRunningStudent'] == true
-                            ? 'Running Student'
-                            : 'Former Student',
-                      ),
-                      _buildInfoRow(
-                        'Payment Status',
-                        _searchResult!['paymentStatus']
-                                ?.toString()
-                                .toUpperCase() ??
-                            'PENDING',
-                      ),
-                      _buildInfoRow(
-                        'Total Payable',
-                        '৳${_searchResult!['totalPayable']?.toString() ?? 'N/A'}',
-                      ),
-                      _buildInfoRow(
-                        'Registration Date',
-                        _formatDate(_searchResult!['registrationTimestamp']),
-                      ),
-                      _buildInfoRow(
-                        'Form Serial',
-                        _searchResult!['formSerialNumber']?.toString() ?? 'N/A',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Quick Actions
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Search Section
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -300,41 +196,90 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Quick Actions',
+                        'Search User by Phone Number',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: Color(0xFF1976D2),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
+                      // Search Type Selector
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _updatePaymentStatus('approved'),
-                              icon: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                              ),
-                              label: const Text('Approve Payment'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
+                            child: RadioListTile<String>(
+                              title: const Text('Phone Number'),
+                              value: 'phone',
+                              groupValue: _searchType,
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchType = value!;
+                                  _searchController.clear();
+                                });
+                              },
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _updatePaymentStatus('rejected'),
-                              icon: const Icon(
-                                Icons.close,
-                                color: Colors.white,
+                            child: RadioListTile<String>(
+                              title: const Text('Form Number'),
+                              value: 'form',
+                              groupValue: _searchType,
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchType = value!;
+                                  _searchController.clear();
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                labelText:
+                                    _searchType == 'phone'
+                                        ? 'Phone Number'
+                                        : 'Form Number',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: Icon(
+                                  _searchType == 'phone'
+                                      ? Icons.phone
+                                      : Icons.numbers,
+                                ),
                               ),
-                              label: const Text('Reject Payment'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
+                              keyboardType:
+                                  _searchType == 'phone'
+                                      ? TextInputType.phone
+                                      : TextInputType.number,
+                              onFieldSubmitted: (_) => _searchUser(),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _searchUser,
+                            icon:
+                                _isLoading
+                                    ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Icon(Icons.search),
+                            label: Text(_isLoading ? 'Searching...' : 'Search'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1976D2),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
                               ),
                             ),
                           ),
@@ -344,12 +289,277 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                   ),
                 ),
               ),
-            ],
 
-            // Empty State
-            if (!_isLoading && _searchResult == null && _errorMessage == null)
-              Expanded(
-                child: Column(
+              const SizedBox(height: 24),
+
+              // Error Message
+              if (_errorMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error, color: Colors.red.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
+              // Search Results
+              if (_searchResult != null) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'User Information',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1976D2),
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _viewUserDetails,
+                                icon: const Icon(Icons.visibility),
+                                label: const Text('View Details'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1976D2),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildInfoRow(
+                            'Name',
+                            _searchResult!['name'] ?? 'N/A',
+                          ),
+                          _buildInfoRow(
+                            'Mobile',
+                            _searchResult!['mobile'] ?? 'N/A',
+                          ),
+                          _buildInfoRow(
+                            'Email',
+                            _searchResult!['email'] ?? 'N/A',
+                          ),
+                          _buildInfoRow(
+                            'Batch',
+                            _searchResult!['batch'] ?? 'N/A',
+                          ),
+                          _buildInfoRow(
+                            'Student Type',
+                            _searchResult!['isRunningStudent'] == true
+                                ? 'Running Student'
+                                : 'Former Student',
+                          ),
+                          _buildInfoRow(
+                            'Payment Status',
+                            _searchResult!['paymentStatus']
+                                    ?.toString()
+                                    .toUpperCase() ??
+                                'PENDING',
+                          ),
+                          _buildInfoRow(
+                            'Total Payable',
+                            '৳${_searchResult!['totalPayable']?.toString() ?? 'N/A'}',
+                          ),
+                          _buildInfoRow(
+                            'Registration Date',
+                            _formatDate(
+                              _searchResult!['registrationTimestamp'],
+                            ),
+                          ),
+                          _buildInfoRow(
+                            'Form Serial',
+                            _searchResult!['formSerialNumber']?.toString() ??
+                                'N/A',
+                          ),
+
+                          // Payment Approval Section
+                          if (_searchResult!['paymentStatus'] == 'pending') ...[
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Payment Approval',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                    ),
+                                    label: const Text('Approve Payment'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder:
+                                            (context) => PaymentApprovalDialog(
+                                              userData: _searchResult!,
+                                              onApproved: () {
+                                                setState(() {
+                                                  _searchResult!['paymentStatus'] =
+                                                      'approved';
+                                                });
+                                              },
+                                            ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                    ),
+                                    label: const Text('Reject'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () async {
+                                      // Implement reject functionality
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Reject functionality not implemented yet',
+                                          ),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          const SizedBox(height: 16),
+
+                          // Quick Actions
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Quick Actions',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            showDialog(
+                                              context: context,
+                                              builder:
+                                                  (
+                                                    context,
+                                                  ) => PaymentApprovalDialog(
+                                                    userData: _searchResult!,
+                                                    onApproved: () {
+                                                      setState(() {
+                                                        _searchResult!['paymentStatus'] =
+                                                            'approved';
+                                                      });
+                                                    },
+                                                  ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.check,
+                                            color: Colors.white,
+                                          ),
+                                          label: const Text('Approve Payment'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            // Implement reject functionality
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Reject functionality not implemented yet',
+                                                ),
+                                                backgroundColor: Colors.orange,
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                          ),
+                                          label: const Text('Reject Payment'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Empty State
+              ],
+              if (!_isLoading && _searchResult == null && _errorMessage == null)
+                Column(
                   children: [
                     Center(
                       child: Column(
@@ -373,11 +583,11 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                     ),
                     const SizedBox(height: 24),
                     // Show recent registrations for reference
-                    Expanded(child: _buildRecentRegistrations()),
+                    _buildRecentRegistrations(),
                   ],
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -412,42 +622,6 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       return '${date.day}/${date.month}/${date.year}';
     } catch (e) {
       return 'Invalid Date';
-    }
-  }
-
-  Future<void> _updatePaymentStatus(String status) async {
-    if (_searchResult == null) return;
-
-    try {
-      final batch = _searchResult!['batch']?.toString();
-      final phone = _searchResult!['mobile']?.toString();
-
-      if (batch != null && phone != null) {
-        await FirebaseFirestore.instance
-            .collection('batches')
-            .doc(batch)
-            .collection('registrations')
-            .doc(phone)
-            .update({'paymentStatus': status});
-
-        setState(() {
-          _searchResult!['paymentStatus'] = status;
-        });
-
-        Get.snackbar(
-          'Success',
-          'Payment status updated to ${status.toUpperCase()}',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to update payment status: $e',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     }
   }
 

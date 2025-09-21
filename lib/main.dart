@@ -7,7 +7,8 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'widgets/payment_handler.dart';
-import 'app/modules/registration/views/registration_page.dart';
+import 'widgets/admin_quick_access_widget.dart';
+import 'app/modules/registration/views/tabbed_registration_page.dart';
 import 'app/modules/registration/bindings/registration_binding.dart';
 import 'firebase_options.dart';
 import 'config/collection_names.dart';
@@ -33,7 +34,6 @@ import 'services/countdown_service.dart';
 import 'admin_panel/services/counter_service.dart';
 import 'services/env_service.dart';
 import 'services/sslcommerz_config.dart';
-import 'test_payment_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +110,7 @@ class GoldenJubileeApp extends StatelessWidget {
           GetPage(name: '/', page: () => const GoldenJubileeHomePage()),
           GetPage(
             name: '/registration',
-            page: () => RegistrationPage(),
+            page: () => TabbedRegistrationPage(),
             binding: RegistrationBinding(),
           ),
           GetPage(name: '/registered', page: () => RegisteredPage()),
@@ -280,12 +280,6 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     }
   }
 
-  // Professional payment integration - Navigate to GetX-based test page
-  Future<void> _launchTestPayment() async {
-    // Navigate to the test payment page
-    Get.to(() => const PaymentPage());
-  }
-
   // Check for payment callbacks from SSLCommerz
   void _checkPaymentCallback() {
     if (kIsWeb) {
@@ -360,6 +354,19 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton:
+          CollectionConfig.isDevelopment
+              ? FloatingActionButton.extended(
+                onPressed: () {
+                  Get.toNamed('/admin');
+                },
+                backgroundColor: const Color(0xFF8B6914),
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.admin_panel_settings),
+                label: const Text('Admin'),
+                tooltip: 'Access Admin Panel',
+              )
+              : null,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -371,6 +378,9 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
 
             // Events Section
             _buildEventsSection(),
+
+            // Admin Quick Access Section (only in development)
+            const AdminQuickAccessWidget(),
 
             // About Section
             _buildAboutSection(),
@@ -525,6 +535,48 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Admin Access Button (only show in development)
+                if (CollectionConfig.isDevelopment)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Center(
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.toNamed('/admin');
+                          },
+                          icon: const Icon(
+                            Icons.admin_panel_settings,
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Admin Panel',
+                            style: TextStyle(
+                              fontSize:
+                                  MediaQuery.of(context).size.width > 600
+                                      ? 16.0
+                                      : 14.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B6914),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            elevation: 4,
                           ),
                         ),
                       ),
@@ -1512,6 +1564,70 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
               ],
             ),
           SizedBox(height: isMobile ? 20.0 : 40.0),
+
+          // Admin Access Section (only in development)
+          if (CollectionConfig.isDevelopment) ...[
+            Container(
+              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.symmetric(vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.admin_panel_settings,
+                    color: Color(0xFFD4AF37),
+                    size: 32,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Admin Access',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Manage registrations, donations, and system settings',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Get.toNamed('/admin');
+                      },
+                      icon: const Icon(Icons.login, size: 18),
+                      label: const Text('Access Admin Panel'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        elevation: 4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           Divider(),
           const Text(
             '© ২০২৪ সুবর্ণজয়ন্তী উদযাপন। সর্বস্বত্ব সংরক্ষিত।',
