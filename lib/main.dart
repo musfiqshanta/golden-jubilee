@@ -54,13 +54,13 @@ void main() async {
   print('   Is Sandbox: ${SSLCommerzConfig.isSandbox}');
   print('   Environment File Loaded: ${EnvService.isEnvFileLoaded}');
 
-  // Set environment - DEVELOPMENT MODE
-  CollectionConfig.setEnvironment(Environment.development);
+  // Set environment - PRODUCTION MODE
+  CollectionConfig.setEnvironment(Environment.production);
 
   // Initialize Firebase (same project, different collections)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Print environment info
+  // Print environment info5
   if (CollectionConfig.isDevelopment) {
     print('🔥 Running in DEVELOPMENT mode - using _dev collections');
   } else {
@@ -372,6 +372,9 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
           children: [
             // Hero Section (with countdown)
             _buildHeroSection(),
+
+            // Help Section
+            _buildHelpSection(),
 
             // 250 Days Countdown Section
             _buildTwoFiftyCountdownSection(),
@@ -864,95 +867,87 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  // Total Collection Row
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(
                                         Icons.attach_money,
                                         color: Colors.white,
-                                        size: 20,
+                                        size: 18,
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 6),
                                       const Text(
-                                        'মোট সংগ্রহ: ',
+                                        'মোট সংগ্রহ:',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 14,
+                                          fontSize: 13,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      SizedBox(
-                                        width: 60, // reduced from 70
-                                        child:
-                                            _isLoadingStats
-                                                ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor:
-                                                        AlwaysStoppedAnimation<
-                                                          Color
-                                                        >(Colors.white),
+                                      const SizedBox(width: 4),
+                                      _isLoadingStats
+                                          ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
                                                   ),
-                                                )
-                                                : Text(
-                                                  '৳$_totalCollections',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                      ),
+                                            ),
+                                          )
+                                          : Text(
+                                            '৳$_totalCollections',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4), // reduced from 5
+                                  const SizedBox(height: 6),
+                                  // Approved Users Row
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(
                                         Icons.check_circle,
                                         color: Colors.white,
-                                        size: 14, // reduced from 16
+                                        size: 16,
                                       ),
-                                      const SizedBox(
-                                        width: 4,
-                                      ), // reduced from 5
+                                      const SizedBox(width: 4),
                                       const Text(
-                                        'অনুমোদিত: ',
+                                        'অনুমোদিত:',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 11, // reduced from 12
+                                          fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      SizedBox(
-                                        width: 25, // reduced from 30
-                                        child:
-                                            _isLoadingStats
-                                                ? const SizedBox(
-                                                  width: 14,
-                                                  height: 14,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor:
-                                                        AlwaysStoppedAnimation<
-                                                          Color
-                                                        >(Colors.white),
+                                      const SizedBox(width: 4),
+                                      _isLoadingStats
+                                          ? const SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
                                                   ),
-                                                )
-                                                : Text(
-                                                  '$_totalApprovedUsers',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                      ),
+                                            ),
+                                          )
+                                          : Text(
+                                            '$_totalApprovedUsers',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                     ],
                                   ),
                                 ],
@@ -1500,6 +1495,185 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
         ],
       ),
     );
+  }
+
+  Widget _buildHelpSection() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        vertical: isMobile ? 40.0 : 60.0,
+        horizontal: 20,
+      ),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600),
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Help Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 40,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Bell Icon and Title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_active,
+                    color: Color(0xFFD4AF37),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'সহায়তা প্রয়োজন?',
+                    style: TextStyle(
+                      fontSize: isMobile ? 20.0 : 24.0,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF8B6914),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+
+              // Description
+              Text(
+                'পেমেন্ট বা নিবন্ধন সংক্রান্ত যেকোনো সমস্যার জন্য আমাদের সাথে যোগাযোগ করুন',
+                style: TextStyle(
+                  fontSize: isMobile ? 14.0 : 16.0,
+                  color: Colors.grey.shade700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 25),
+
+              // WhatsApp Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _launchWhatsApp(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 3,
+                  ),
+                  icon: const Icon(Icons.chat, size: 20),
+                  label: const Text(
+                    'WhatsApp এ যোগাযোগ করুন',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Phone Number
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.phone, color: Colors.black87, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '01767122407',
+                    style: TextStyle(
+                      fontSize: isMobile ? 16.0 : 18.0,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Launch WhatsApp with predefined message
+  Future<void> _launchWhatsApp() async {
+    // Remove leading zero and add country code for Bangladesh (+880)
+    const phoneNumber =
+        '8801767122407'; // Bangladesh country code +880, remove leading 0
+    const message =
+        'হ্যালো! আমি গোল্ডেন জুবিলি নিবন্ধন বা পেমেন্ট সংক্রান্ত সাহায্য চাই।';
+
+    // Create WhatsApp URL with proper format
+    final whatsappUrl =
+        'https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}';
+
+    try {
+      final uri = Uri.parse(whatsappUrl);
+      print('Attempting to launch WhatsApp URL: $whatsappUrl');
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('WhatsApp launched successfully');
+      } else {
+        print('Cannot launch WhatsApp URL, trying fallback');
+        // Fallback: try to open WhatsApp app directly
+        final whatsappAppUrl =
+            'whatsapp://send?phone=$phoneNumber&text=${Uri.encodeComponent(message)}';
+        final appUri = Uri.parse(whatsappAppUrl);
+        print('Attempting fallback WhatsApp URL: $whatsappAppUrl');
+
+        if (await canLaunchUrl(appUri)) {
+          await launchUrl(appUri, mode: LaunchMode.externalApplication);
+          print('WhatsApp app launched successfully');
+        } else {
+          print('Both WhatsApp URLs failed');
+          // Show error message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'WhatsApp খোলা যায়নি। অনুগ্রহ করে সরাসরি কল করুন: 01767122407',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error launching WhatsApp: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'WhatsApp খোলা যায়নি। অনুগ্রহ করে সরাসরি কল করুন: 01767122407',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildContactSection() {

@@ -1277,7 +1277,7 @@ class RegistrationController extends GetxController {
     designationController.text = 'ডেমো পদবী';
     workplaceAddressController.text = 'ডেমো কর্মস্থল';
     nationalIdController.text = '1234567890123';
-    emailController.text = 'demo@example.com';
+    // DO NOT override email - keep user's input
     selectedGender.value = 'পুরুষ';
     selectedBloodGroup.value = 'A+';
     selectedReligion.value = 'ইসলাম';
@@ -1324,6 +1324,7 @@ class RegistrationController extends GetxController {
     // Clear all fields
     nameController.clear();
     mobileController.clear();
+    emailController.clear();
     selectedDateOfBirth.value = null;
     selectedSscPassingYear.value = '';
     selectedFinalClass.value = '';

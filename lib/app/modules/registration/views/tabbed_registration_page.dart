@@ -144,6 +144,25 @@ class QuickRegistrationTab extends GetView<RegistrationController> {
                             : null,
               ),
               const SizedBox(height: 15),
+              _textField(
+                controller: controller.emailController,
+                label: 'ইমেইল ঠিকানা (ঐচ্ছিক)',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                hintText: 'ইংরেজিতে ইমেইল ঠিকানা লিখুন (ঐচ্ছিক)',
+                validator: (value) {
+                  // Optional field - only validate if provided
+                  if (value != null && value.isNotEmpty) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}',
+                    ).hasMatch(value)) {
+                      return 'সঠিক ইমেইল লিখুন';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 15),
 
               // Current Studying Checkbox
               Obx(

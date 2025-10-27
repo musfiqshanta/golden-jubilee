@@ -106,154 +106,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final paymentStatus = data['paymentStatus'] ?? '';
         final totalPayable = (data['totalPayable'] ?? 0) as num;
 
-        // Debug: Print first few documents to understand the data structure
-        if (doc == snapshot.docs.first) {
-          print('📋 Sample document structure:');
-          print('   Payment Status: $paymentStatus');
-          print('   Total Payable: $totalPayable');
-          print('   Available fields: ${data.keys.toList()}');
-
-          // Check for various payment method field names
-          final possiblePaymentFields = [
-            'paymentMethod',
-            'payment_method',
-            'paymentType',
-            'payment_type',
-            'sslcommerz',
-            'isOnlinePayment',
-            'is_online_payment',
-            'gateway',
-          ];
-
-          for (String field in possiblePaymentFields) {
-            if (data.containsKey(field)) {
-              print('   $field: ${data[field]}');
-            }
-          }
-        }
-
         if (paymentStatus == 'approved') {
-          // Check for online payment indicators
-          bool isOnlinePayment = false;
-
-          // First check if paymentData exists and contains online payment indicators
-          final paymentData = data['paymentData'];
-          if (paymentData != null && paymentData is Map<String, dynamic>) {
-            // Check for SSLCommerz indicators in paymentData
-            final paymentMethod =
-                paymentData['payment_method'] ??
-                paymentData['paymentMethod'] ??
-                '';
-            final tranId = paymentData['tran_id'] ?? '';
-            final valId = paymentData['val_id'] ?? '';
-            final status = paymentData['status'] ?? '';
-            final storeId = paymentData['store_id'] ?? '';
-
-            // If any of these SSLCommerz fields exist, it's an online payment
-            if (paymentMethod.toLowerCase().contains('sslcommerz') ||
-                paymentMethod.toLowerCase().contains('bkash') ||
-                paymentMethod.toLowerCase().contains('mobilebanking') ||
-                tranId.isNotEmpty ||
-                valId.isNotEmpty ||
-                status.toLowerCase() == 'valid' ||
-                storeId.isNotEmpty) {
-              isOnlinePayment = true;
-            }
-          }
-
-          // Fallback to original logic for backward compatibility
-          if (!isOnlinePayment) {
-            // Check various possible field names and values for online payments
-            final paymentMethod =
-                data['paymentMethod'] ?? data['payment_method'] ?? '';
-            final paymentType =
-                data['paymentType'] ?? data['payment_type'] ?? '';
-            final sslcommerz = data['sslcommerz'] ?? '';
-            final isOnlinePaymentField =
-                data['isOnlinePayment'] ?? data['is_online_payment'] ?? false;
-            final gateway = data['gateway'] ?? '';
-
-            // Check if it's an online payment
-            if (paymentMethod.toLowerCase().contains('sslcommerz') ||
-                paymentMethod.toLowerCase().contains('online') ||
-                paymentMethod.toLowerCase().contains('bkash') ||
-                paymentType.toLowerCase().contains('sslcommerz') ||
-                paymentType.toLowerCase().contains('online') ||
-                sslcommerz.toString().toLowerCase().contains('true') ||
-                isOnlinePaymentField == true ||
-                gateway.toLowerCase().contains('sslcommerz') ||
-                gateway.toLowerCase().contains('online')) {
-              isOnlinePayment = true;
-            }
-
-            // If no specific online payment indicator, check if there's a transaction ID or similar
-            if (!isOnlinePayment) {
-              final transactionId =
-                  data['transactionId'] ??
-                  data['transaction_id'] ??
-                  data['sslcommerzTransactionId'] ??
-                  '';
-              final paymentId = data['paymentId'] ?? data['payment_id'] ?? '';
-              if (transactionId.isNotEmpty || paymentId.isNotEmpty) {
-                isOnlinePayment = true;
-              }
-            }
-
-            // Fallback: If we can't detect online payments, let's use a different approach
-            // Check if the user has specific fields that indicate online payment
-            if (!isOnlinePayment) {
-              // Check for SSLCommerz specific fields
-              final sslcommerzStatus = data['sslcommerzStatus'] ?? '';
-              final sslcommerzTranId = data['sslcommerzTranId'] ?? '';
-              final sslcommerzValId = data['sslcommerzValId'] ?? '';
-              final sslcommerzAmount = data['sslcommerzAmount'] ?? '';
-
-              if (sslcommerzStatus.isNotEmpty ||
-                  sslcommerzTranId.isNotEmpty ||
-                  sslcommerzValId.isNotEmpty ||
-                  sslcommerzAmount.isNotEmpty) {
-                isOnlinePayment = true;
-              }
-            }
-
-            // Another fallback: Check if payment was made through a specific date range or has certain patterns
-            if (!isOnlinePayment) {
-              // Check if there's a payment date that might indicate online payment
-              final paymentDate =
-                  data['paymentDate'] ?? data['payment_date'] ?? '';
-              final registrationDate =
-                  data['registrationDate'] ?? data['registration_date'] ?? '';
-
-              // If payment date is very close to registration date, it might be online
-              if (paymentDate.isNotEmpty && registrationDate.isNotEmpty) {
-                try {
-                  final payDate = DateTime.parse(paymentDate);
-                  final regDate = DateTime.parse(registrationDate);
-                  final difference = payDate.difference(regDate).inDays;
-
-                  // If payment was made within 1 day of registration, likely online
-                  if (difference <= 1) {
-                    isOnlinePayment = true;
-                  }
-                } catch (e) {
-                  // Ignore date parsing errors
-                }
-              }
-            }
-          }
+          // Use the exact same logic as the detail screens
+          bool isOnlinePayment = _isOnlinePayment(data);
 
           if (isOnlinePayment) {
             onlinePaymentUsers++;
             onlinePaymentAmount += totalPayable.toDouble();
-            print(
-              '   ✅ Online payment detected: ${data['name'] ?? 'Unknown'} - ৳$totalPayable',
-            );
           } else {
             manualApprovalUsers++;
             manualApprovalAmount += totalPayable.toDouble();
-            print(
-              '   📝 Manual approval: ${data['name'] ?? 'Unknown'} - ৳$totalPayable',
-            );
           }
         }
       }
@@ -263,34 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _manualApprovalUsers = manualApprovalUsers;
         _onlinePaymentAmount = onlinePaymentAmount;
         _manualApprovalAmount = manualApprovalAmount;
-      });
-
-      // If we couldn't detect any online payments, let's use a different approach
-      if (onlinePaymentUsers == 0 && manualApprovalUsers > 0) {
-        print('⚠️  No online payments detected. Using alternative logic...');
-
-        // Let's assume 30% are online payments and 70% are manual approvals
-        // This is a temporary solution until we understand the data structure better
-        final totalUsers = manualApprovalUsers;
-        final totalAmount = manualApprovalAmount;
-
-        onlinePaymentUsers = (totalUsers * 0.3).round();
-        onlinePaymentAmount = totalAmount * 0.3;
-
-        manualApprovalUsers = totalUsers - onlinePaymentUsers;
-        manualApprovalAmount = totalAmount - onlinePaymentAmount;
-
-        _isUsingEstimatedData = true;
-        print('📊 Using estimated split (30% online, 70% manual):');
-      } else {
         _isUsingEstimatedData = false;
-      }
-
-      setState(() {
-        _onlinePaymentUsers = onlinePaymentUsers;
-        _manualApprovalUsers = manualApprovalUsers;
-        _onlinePaymentAmount = onlinePaymentAmount;
-        _manualApprovalAmount = manualApprovalAmount;
       });
 
       print('✅ Payment breakdown loaded:');
@@ -303,6 +138,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       print('Error loading payment breakdown data: $e');
     }
+  }
+
+  // Check if a payment is online payment - MUST match the logic in detail screens
+  bool _isOnlinePayment(Map<String, dynamic> data) {
+    // Check if paymentData exists and contains online payment indicators
+    final paymentData = data['paymentData'];
+    if (paymentData != null && paymentData is Map<String, dynamic>) {
+      // Check for SSLCommerz indicators in paymentData
+      final paymentMethod =
+          paymentData['payment_method'] ?? paymentData['paymentMethod'] ?? '';
+      final tranId = paymentData['tran_id'] ?? '';
+      final valId = paymentData['val_id'] ?? '';
+      final status = paymentData['status'] ?? '';
+      final storeId = paymentData['store_id'] ?? '';
+
+      // If any of these SSLCommerz fields exist, it's an online payment
+      if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+          paymentMethod.toLowerCase().contains('bkash') ||
+          paymentMethod.toLowerCase().contains('mobilebanking') ||
+          tranId.isNotEmpty ||
+          valId.isNotEmpty ||
+          status.toLowerCase() == 'valid' ||
+          storeId.isNotEmpty) {
+        return true;
+      }
+    }
+
+    // Fallback to original logic for backward compatibility
+    final paymentMethod = data['paymentMethod'] ?? data['payment_method'] ?? '';
+    final paymentType = data['paymentType'] ?? data['payment_type'] ?? '';
+    final sslcommerz = data['sslcommerz'] ?? '';
+    final isOnlinePaymentField =
+        data['isOnlinePayment'] ?? data['is_online_payment'] ?? false;
+    final gateway = data['gateway'] ?? '';
+
+    // Check if it's an online payment
+    if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+        paymentMethod.toLowerCase().contains('online') ||
+        paymentMethod.toLowerCase().contains('bkash') ||
+        paymentType.toLowerCase().contains('sslcommerz') ||
+        paymentType.toLowerCase().contains('online') ||
+        sslcommerz.toString().toLowerCase().contains('true') ||
+        isOnlinePaymentField == true ||
+        gateway.toLowerCase().contains('sslcommerz') ||
+        gateway.toLowerCase().contains('online')) {
+      return true;
+    }
+
+    // Check for transaction IDs
+    final transactionId =
+        data['transactionId'] ??
+        data['transaction_id'] ??
+        data['sslcommerzTransactionId'] ??
+        '';
+    final paymentId = data['paymentId'] ?? data['payment_id'] ?? '';
+    if (transactionId.isNotEmpty || paymentId.isNotEmpty) {
+      return true;
+    }
+
+    // Check for SSLCommerz specific fields
+    final sslcommerzStatus = data['sslcommerzStatus'] ?? '';
+    final sslcommerzTranId = data['sslcommerzTranId'] ?? '';
+    final sslcommerzValId = data['sslcommerzValId'] ?? '';
+    final sslcommerzAmount = data['sslcommerzAmount'] ?? '';
+
+    if (sslcommerzStatus.isNotEmpty ||
+        sslcommerzTranId.isNotEmpty ||
+        sslcommerzValId.isNotEmpty ||
+        sslcommerzAmount.isNotEmpty) {
+      return true;
+    }
+
+    return false;
   }
 
   @override

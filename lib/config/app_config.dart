@@ -7,8 +7,8 @@ class AppConfig {
 
   /// Check if running in development mode
   static bool get isDevelopment {
-    // Force development mode for testing
-    return true; // kDebugMode || _isDevelopmentEnvironment;
+    // Force production mode - set to false for production deployment
+    return false; // kDebugMode || _isDevelopmentEnvironment;
   }
 
   /// Check if running in production mode

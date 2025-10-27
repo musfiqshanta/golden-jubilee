@@ -1,7 +1,7 @@
 enum Environment { development, production }
 
 class CollectionConfig {
-  static Environment _environment = Environment.development;
+  static Environment _environment = Environment.production;
 
   static void setEnvironment(Environment env) {
     _environment = env;

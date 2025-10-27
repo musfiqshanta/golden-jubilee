@@ -490,6 +490,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                 label: 'স্বামী/স্ত্রী/সন্তান',
                                 value: controller.spouseCount.value,
                                 maxValue: 3,
+                                context: context,
                                 onChanged: (value) {
                                   // Ensure total guests don't exceed 3
                                   final currentChildCount =
@@ -517,6 +518,7 @@ class RegistrationPage extends GetView<RegistrationController> {
                                 label: 'অন্যান্য আতিথী',
                                 value: controller.childCount.value,
                                 maxValue: 3,
+                                context: context,
                                 onChanged: (value) {
                                   // Ensure total guests don't exceed 3
                                   final currentSpouseCount =
@@ -1257,38 +1259,50 @@ class RegistrationPage extends GetView<RegistrationController> {
     required int value,
     required void Function(int) onChanged,
     int? maxValue,
+    required BuildContext context,
   }) {
+    // Detect mobile screen
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 16,
+          style: TextStyle(
+            fontSize: isMobile ? 13 : 16,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF8B6914),
+            color: const Color(0xFF8B6914),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 4 : 8),
         Row(
           children: [
             IconButton(
               onPressed: value > 0 ? () => onChanged(value - 1) : null,
-              icon: const Icon(Icons.remove_circle_outline),
+              icon: Icon(Icons.remove_circle_outline, size: isMobile ? 18 : 24),
               color: const Color(0xFFD4AF37),
+              padding: EdgeInsets.zero,
+              constraints:
+                  isMobile
+                      ? const BoxConstraints(minWidth: 28, minHeight: 28)
+                      : const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 8 : 20,
+                vertical: isMobile ? 4 : 8,
+              ),
               decoration: BoxDecoration(
                 border: Border.all(color: const Color(0xFFD4AF37)),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
                 value.toString(),
-                style: const TextStyle(
-                  fontSize: 18,
+                style: TextStyle(
+                  fontSize: isMobile ? 14 : 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B6914),
+                  color: const Color(0xFF8B6914),
                 ),
               ),
             ),
@@ -1297,11 +1311,16 @@ class RegistrationPage extends GetView<RegistrationController> {
                   maxValue != null && value >= maxValue
                       ? null
                       : () => onChanged(value + 1),
-              icon: const Icon(Icons.add_circle_outline),
+              icon: Icon(Icons.add_circle_outline, size: isMobile ? 18 : 24),
               color:
                   maxValue != null && value >= maxValue
                       ? Colors.grey
                       : const Color(0xFFD4AF37),
+              padding: EdgeInsets.zero,
+              constraints:
+                  isMobile
+                      ? const BoxConstraints(minWidth: 28, minHeight: 28)
+                      : const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
           ],
         ),
@@ -1310,8 +1329,8 @@ class RegistrationPage extends GetView<RegistrationController> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'সর্বোচ্চ: $maxValue জন',
-              style: const TextStyle(
-                fontSize: 12,
+              style: TextStyle(
+                fontSize: isMobile ? 10 : 12,
                 color: Colors.grey,
                 fontStyle: FontStyle.italic,
               ),

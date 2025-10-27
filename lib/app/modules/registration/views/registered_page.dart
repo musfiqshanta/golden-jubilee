@@ -524,17 +524,23 @@ class BatchDetailsPage extends StatelessWidget {
                     leading: CircleAvatar(
                       backgroundColor: Colors.grey.shade200,
                       radius: 20,
-                      child: ClipOval(
-                        child: Image.network(
-                          photoUrl!,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.person, color: Colors.grey);
-                          },
-                        ),
-                      ),
+                      child:
+                          photoUrl != null && photoUrl.isNotEmpty
+                              ? ClipOval(
+                                child: Image.network(
+                                  photoUrl,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(
+                                      Icons.person,
+                                      color: Colors.grey,
+                                    );
+                                  },
+                                ),
+                              )
+                              : const Icon(Icons.person, color: Colors.grey),
                     ),
                     title: Text(
                       name,

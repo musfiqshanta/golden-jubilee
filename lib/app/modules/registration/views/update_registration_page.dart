@@ -56,6 +56,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   String? finalClass;
   String? year;
   String? sscPassingYear;
+  DateTime? dateOfBirth;
 
   // Checkboxes
   bool isRunningStudent = false;
@@ -317,6 +318,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'nationality': nationality,
         'religion': religion,
         'bloodGroup': bloodGroup,
+        'dateOfBirth': dateOfBirth?.toIso8601String(),
         'tshirtSize': tshirtSize,
         'spouseCount': spouseCount,
         'childCount': childCount,
@@ -426,6 +428,16 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     year = d['year'] ?? '2024';
     sscPassingYear = d['sscPassingYear'] ?? 'None';
 
+    // Date of Birth
+    if (d['dateOfBirth'] != null) {
+      try {
+        dateOfBirth = DateTime.parse(d['dateOfBirth']);
+      } catch (e) {
+        print('Error parsing date of birth: $e');
+        dateOfBirth = null;
+      }
+    }
+
     // Checkboxes
     isRunningStudent = d['isRunningStudent'] == true;
     isStillStudying = d['isStillStudying'] == true;
@@ -470,6 +482,22 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
   void _updateGuestDetails() {
     _initializeGuestDetails();
     setState(() {});
+  }
+
+  Future<void> _selectDateOfBirth(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate:
+          dateOfBirth ??
+          DateTime.now().subtract(const Duration(days: 6570)), // ~18 years ago
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        dateOfBirth = picked;
+      });
+    }
   }
 
   Future<void> _pickPhoto() async {
@@ -713,6 +741,7 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
         'nationality': nationality,
         'religion': religion,
         'bloodGroup': bloodGroup,
+        'dateOfBirth': dateOfBirth?.toIso8601String(),
         'tshirtSize': tshirtSize,
         'spouseCount': spouseCount,
         'childCount': childCount,
@@ -1100,6 +1129,45 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 15),
+                  // Date of Birth Field
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => _selectDateOfBirth(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 15,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              color: Color(0xFFD4AF37),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              dateOfBirth != null
+                                  ? '${dateOfBirth!.day}/${dateOfBirth!.month}/${dateOfBirth!.year}'
+                                  : 'জন্ম তারিখ নির্বাচন করুন',
+                              style: TextStyle(
+                                color:
+                                    dateOfBirth != null
+                                        ? Colors.black
+                                        : Colors.grey,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ]),
 
@@ -1842,41 +1910,52 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
     int? maxValue,
     int? minValue,
   }) {
+    // Detect mobile screen
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 16,
+          style: TextStyle(
+            fontSize: isMobile ? 13 : 16,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF8B6914),
+            color: const Color(0xFF8B6914),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: isMobile ? 4 : 8),
         Row(
           children: [
             IconButton(
               onPressed:
                   value > (minValue ?? 0) ? () => onChanged(value - 1) : null,
-              icon: const Icon(Icons.remove_circle_outline),
+              icon: Icon(Icons.remove_circle_outline, size: isMobile ? 18 : 24),
               color:
                   value > (minValue ?? 0)
                       ? const Color(0xFFD4AF37)
                       : Colors.grey,
+              padding: EdgeInsets.zero,
+              constraints:
+                  isMobile
+                      ? const BoxConstraints(minWidth: 28, minHeight: 28)
+                      : const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 8 : 20,
+                vertical: isMobile ? 4 : 8,
+              ),
               decoration: BoxDecoration(
                 border: Border.all(color: const Color(0xFFD4AF37)),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
                 value.toString(),
-                style: const TextStyle(
-                  fontSize: 18,
+                style: TextStyle(
+                  fontSize: isMobile ? 14 : 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B6914),
+                  color: const Color(0xFF8B6914),
                 ),
               ),
             ),
@@ -1885,11 +1964,16 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                   maxValue != null && value >= maxValue
                       ? null
                       : () => onChanged(value + 1),
-              icon: const Icon(Icons.add_circle_outline),
+              icon: Icon(Icons.add_circle_outline, size: isMobile ? 18 : 24),
               color:
                   maxValue != null && value >= maxValue
                       ? Colors.grey
                       : const Color(0xFFD4AF37),
+              padding: EdgeInsets.zero,
+              constraints:
+                  isMobile
+                      ? const BoxConstraints(minWidth: 28, minHeight: 28)
+                      : const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
           ],
         ),
@@ -1898,8 +1982,8 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'সর্বোচ্চ: $maxValue জন',
-              style: const TextStyle(
-                fontSize: 12,
+              style: TextStyle(
+                fontSize: isMobile ? 10 : 12,
                 color: Colors.grey,
                 fontStyle: FontStyle.italic,
               ),

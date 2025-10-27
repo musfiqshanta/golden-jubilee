@@ -519,6 +519,22 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
       // Calculate total payable amount (matching actual registration logic)
       final int totalPayable = _calculateTotalPayable();
 
+      // Get form serial number using the same logic as regular registration
+      final counterRef = FirebaseFirestore.instance
+          .collection('counters')
+          .doc('registration');
+      int formSerialNumber = 1;
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(counterRef);
+        if (snapshot.exists) {
+          formSerialNumber = (snapshot.data()?['value'] ?? 0) + 1;
+          transaction.update(counterRef, {'value': formSerialNumber});
+        } else {
+          transaction.set(counterRef, {'value': 1});
+          formSerialNumber = 1;
+        }
+      });
+
       final registrationData = {
         'name': _nameController.text.trim(),
         'fatherName': _fatherNameController.text.trim(),
@@ -564,6 +580,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         },
         'guestNames': _guestNames,
         'guestRelationships': _guestRelationships,
+        'formSerialNumber': formSerialNumber,
         'createdBy': 'admin',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -595,10 +612,10 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'User "${_nameController.text}" registered successfully!',
+              'User "${_nameController.text}" registered successfully!\nForm Number: $formSerialNumber',
             ),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
           ),
         );
 
@@ -606,7 +623,9 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         _clearForm();
       }
 
-      print('✅ Admin registration saved successfully: ${_nameController.text}');
+      print(
+        '✅ Admin registration saved successfully: ${_nameController.text} (Form #$formSerialNumber)',
+      );
     } catch (e) {
       print('Error saving admin registration: $e');
       if (mounted) {
