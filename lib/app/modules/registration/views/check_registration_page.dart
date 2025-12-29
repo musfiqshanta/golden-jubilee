@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/app/services/pdf_service.dart';
@@ -18,6 +19,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
   final TextEditingController phoneController = TextEditingController();
   List<String> availableBatches = [];
   Map<String, dynamic>? foundRegistration;
+  String? foundDocumentId; // Store the actual document ID found
   bool isLoading = false;
   bool hasSearched = false;
   bool isLoadingBatches = true;
@@ -164,6 +166,31 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     }
   }
 
+  /// Normalize phone number by removing all types of whitespace and hidden characters
+  String _normalizePhoneNumber(String phone) {
+    if (phone.isEmpty) return phone;
+
+    // Remove all Unicode whitespace characters including:
+    // - Regular spaces
+    // - Non-breaking spaces (\u00A0)
+    // - Zero-width spaces (\u200B)
+    // - Zero-width non-breaking spaces (\uFEFF)
+    // - And all other Unicode whitespace
+    String normalized = phone.trim();
+
+    // Remove all Unicode whitespace characters
+    normalized = normalized.replaceAll(
+      RegExp(r'[\s\u00A0\u200B\u200C\u200D\uFEFF]'),
+      '',
+    );
+
+    // Remove any other invisible/formatting characters that might have been accidentally inserted
+    // Keep only digits
+    normalized = normalized.replaceAll(RegExp(r'[^\d]'), '');
+
+    return normalized;
+  }
+
   Future<void> _checkRegistration() async {
     if (selectedBatch == null || phoneController.text.trim().isEmpty) {
       Get.snackbar(
@@ -178,24 +205,121 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
     setState(() {
       isLoading = true;
       foundRegistration = null;
+      foundDocumentId = null;
       hasSearched = true;
     });
 
     try {
-      final doc =
+      // Normalize phone number: remove all spaces and hidden characters
+      final phoneInput = phoneController.text.trim();
+      final phoneNormalized = _normalizePhoneNumber(phoneInput);
+
+      // Try multiple search approaches
+      Map<String, dynamic>? registrationData;
+      String? documentId;
+
+      // Approach 1: Try direct document lookup with trimmed input
+      var doc =
           await FirebaseFirestore.instance
               .collection(CollectionConfig.batchesCollection)
               .doc(selectedBatch)
               .collection(CollectionConfig.registrationsCollection)
-              .doc(phoneController.text.trim())
+              .doc(phoneInput)
               .get();
 
+      if (doc.exists) {
+        registrationData = doc.data();
+        documentId = phoneInput;
+      } else {
+        // Approach 2: Try with normalized phone (all spaces removed)
+        if (phoneNormalized != phoneInput) {
+          doc =
+              await FirebaseFirestore.instance
+                  .collection(CollectionConfig.batchesCollection)
+                  .doc(selectedBatch)
+                  .collection(CollectionConfig.registrationsCollection)
+                  .doc(phoneNormalized)
+                  .get();
+
+          if (doc.exists) {
+            registrationData = doc.data();
+            documentId = phoneNormalized;
+          }
+        }
+
+        // Approach 3: If still not found, query by mobile field (handles spaces in database)
+        if (registrationData == null) {
+          final querySnapshot =
+              await FirebaseFirestore.instance
+                  .collection(CollectionConfig.batchesCollection)
+                  .doc(selectedBatch)
+                  .collection(CollectionConfig.registrationsCollection)
+                  .where('mobile', isEqualTo: phoneInput)
+                  .limit(1)
+                  .get();
+
+          if (querySnapshot.docs.isNotEmpty) {
+            registrationData = querySnapshot.docs.first.data();
+            documentId = querySnapshot.docs.first.id;
+          } else {
+            // Approach 4: Try querying with normalized phone
+            if (phoneNormalized != phoneInput) {
+              final querySnapshot2 =
+                  await FirebaseFirestore.instance
+                      .collection(CollectionConfig.batchesCollection)
+                      .doc(selectedBatch)
+                      .collection(CollectionConfig.registrationsCollection)
+                      .where('mobile', isEqualTo: phoneNormalized)
+                      .limit(1)
+                      .get();
+
+              if (querySnapshot2.docs.isNotEmpty) {
+                registrationData = querySnapshot2.docs.first.data();
+                documentId = querySnapshot2.docs.first.id;
+              }
+            }
+
+            // Approach 5: Try querying mobile field with spaces removed from stored values
+            if (registrationData == null) {
+              final allDocs =
+                  await FirebaseFirestore.instance
+                      .collection(CollectionConfig.batchesCollection)
+                      .doc(selectedBatch)
+                      .collection(CollectionConfig.registrationsCollection)
+                      .get();
+
+              for (var document in allDocs.docs) {
+                final data = document.data();
+                final storedMobile = data['mobile']?.toString() ?? '';
+                final storedMobileNormalized = _normalizePhoneNumber(
+                  storedMobile,
+                );
+
+                // Compare normalized versions (most reliable)
+                // Also try direct matches as fallback
+                if (storedMobileNormalized == phoneNormalized ||
+                    _normalizePhoneNumber(storedMobile) == phoneNormalized ||
+                    storedMobile.trim() == phoneInput ||
+                    storedMobile == phoneInput ||
+                    storedMobile.trim() == phoneNormalized ||
+                    storedMobile == phoneNormalized) {
+                  registrationData = data;
+                  documentId = document.id;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
       setState(() {
-        foundRegistration = doc.exists ? doc.data() : null;
+        foundRegistration = registrationData;
+        foundDocumentId = documentId;
         isLoading = false;
       });
 
-      if (!doc.exists) {
+      if (foundRegistration == null) {
         Get.snackbar(
           'ফলাফল',
           'এই মোবাইল নম্বরটি এই ব্যাচে পাওয়া যায়নি',
@@ -412,6 +536,10 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                         TextFormField(
                           controller: phoneController,
                           keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            // Automatically remove spaces as user types
+                            FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                          ],
                           decoration: InputDecoration(
                             labelText: 'মোবাইল নম্বর',
                             hintText: '01XXXXXXXXX',
@@ -578,10 +706,17 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                     ),
                                     onPressed: () async {
                                       print('Opening update page...');
+                                      // Use the actual document ID found, or fallback to mobile field or input
+                                      final phoneToUse =
+                                          foundDocumentId ??
+                                          (foundRegistration!['mobile']
+                                                  ?.toString() ??
+                                              phoneController.text.trim());
+
                                       final result = await Get.to(
                                         () => UpdateRegistrationPage(
                                           batchId: selectedBatch!,
-                                          phone: phoneController.text.trim(),
+                                          phone: phoneToUse,
                                           registrationData: foundRegistration!,
                                         ),
                                       );
@@ -598,6 +733,7 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
                                         // Clear current data first
                                         setState(() {
                                           foundRegistration = null;
+                                          foundDocumentId = null;
                                           hasSearched = false;
                                         });
                                         // Wait a moment then refresh
@@ -1193,7 +1329,9 @@ class _CheckRegistrationPageState extends State<CheckRegistrationPage> {
 
       // Save to Firestore
       final batch = registration['batch'] as String;
-      final phone = registration['mobile'] as String;
+      // Use found document ID if available, otherwise use mobile field
+      final phone =
+          foundDocumentId ?? (registration['mobile'] as String? ?? '');
 
       await FirebaseFirestore.instance
           .collection(CollectionConfig.batchesCollection)

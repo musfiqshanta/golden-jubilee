@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin_registered_page.dart';
 
@@ -175,8 +181,168 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
   final String batchId;
   const _ApprovedBatchDetailsPage({required this.batchId});
 
+  Future<void> _copyUserDetails(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) async {
+    final buffer = StringBuffer();
+    buffer.writeln('Form Number: ${data['formSerialNumber'] ?? 'N/A'}');
+    buffer.writeln('Name: ${data['name'] ?? 'N/A'}');
+    buffer.writeln('Occupation: ${data['occupation'] ?? 'N/A'}');
+    buffer.writeln('Blood Group: ${data['bloodGroup'] ?? 'N/A'}');
+    buffer.writeln('Mobile: ${data['mobile'] ?? 'N/A'}');
+    buffer.writeln('Present Address: ${data['presentAddress'] ?? 'N/A'}');
+
+    final textToCopy = buffer.toString();
+    await Clipboard.setData(ClipboardData(text: textToCopy));
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${data['name'] ?? 'User'} details copied!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _downloadImage(
+    BuildContext context,
+    String? photoUrl,
+    String userName,
+  ) async {
+    if (photoUrl == null || photoUrl.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No image available for this user'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Downloading image...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      if (kIsWeb) {
+        // For web platform - open image in new tab for easy download
+        final uri = Uri.parse(photoUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image opened in new tab. Right-click to save.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Could not open image URL');
+        }
+      } else {
+        // For mobile/desktop platforms
+        final response = await http.get(Uri.parse(photoUrl));
+        if (response.statusCode == 200) {
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName =
+              '${userName.replaceAll(RegExp(r'[^\w\s-]'), '_')}_photo.jpg';
+          final file = File('${directory.path}/$fileName');
+          await file.writeAsBytes(response.bodyBytes);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Image saved to: ${file.path}'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Failed to download image: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error downloading image: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyAllDetails(
+    BuildContext context,
+    List<QueryDocumentSnapshot> regs,
+  ) async {
+    final buffer = StringBuffer();
+    buffer.writeln('═══════════════════════════════════════════════════');
+    buffer.writeln('APPROVED USERS - BATCH: $batchId');
+    buffer.writeln('═══════════════════════════════════════════════════');
+    buffer.writeln('Total Users: ${regs.length}');
+    buffer.writeln('');
+    buffer.writeln('═══════════════════════════════════════════════════');
+    buffer.writeln('');
+
+    for (int i = 0; i < regs.length; i++) {
+      final reg = regs[i];
+      final data = reg.data() as Map<String, dynamic>;
+
+      buffer.writeln(
+        '${i + 1}. Form Number: ${data['formSerialNumber'] ?? 'N/A'}',
+      );
+      buffer.writeln('   Name: ${data['name'] ?? 'N/A'}');
+      buffer.writeln('   Occupation: ${data['occupation'] ?? 'N/A'}');
+      buffer.writeln('   Blood Group: ${data['bloodGroup'] ?? 'N/A'}');
+      buffer.writeln('   Mobile: ${data['mobile'] ?? 'N/A'}');
+      buffer.writeln('   Present Address: ${data['presentAddress'] ?? 'N/A'}');
+      buffer.writeln('');
+      buffer.writeln('─────────────────────────────────────────────────');
+      buffer.writeln('');
+    }
+
+    final textToCopy = buffer.toString();
+    await Clipboard.setData(ClipboardData(text: textToCopy));
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All user details copied to clipboard!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final stream =
+        FirebaseFirestore.instance
+            .collection('batches')
+            .doc(batchId)
+            .collection('registrations')
+            .where('paymentStatus', isEqualTo: 'approved')
+            .snapshots();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -187,13 +353,7 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('batches')
-                .doc(batchId)
-                .collection('registrations')
-                .where('paymentStatus', isEqualTo: 'approved')
-                .snapshots(),
+        stream: stream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -250,6 +410,22 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
                     'Mobile: $mobile',
                     style: const TextStyle(letterSpacing: 1.2),
                   ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.download, color: Colors.white),
+                        tooltip: 'Download image',
+                        onPressed:
+                            () => _downloadImage(context, photoUrl, name),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, color: Colors.white),
+                        tooltip: 'Copy user details',
+                        onPressed: () => _copyUserDetails(context, data),
+                      ),
+                    ],
+                  ),
                   onTap: () {
                     showDialog(
                       context: context,
@@ -259,6 +435,25 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
                 ),
               );
             },
+          );
+        },
+      ),
+      floatingActionButton: StreamBuilder<QuerySnapshot>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          final regs = snapshot.data!.docs;
+          return FloatingActionButton.extended(
+            onPressed: () => _copyAllDetails(context, regs),
+            icon: const Icon(Icons.copy, color: Colors.white),
+            label: const Text(
+              'Copy Details',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFF1976D2),
+            tooltip: 'Copy all user details to clipboard',
           );
         },
       ),

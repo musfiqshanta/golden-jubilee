@@ -16,7 +16,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _searchResult;
   String? _errorMessage;
-  String _searchType = 'phone'; // 'phone' or 'form'
+  String _searchType = 'phone'; // 'phone', 'form', or 'transaction'
 
   @override
   void dispose() {
@@ -45,8 +45,10 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
       if (_searchType == 'phone') {
         await _searchByPhone(searchQuery);
-      } else {
+      } else if (_searchType == 'form') {
         await _searchByFormNumber(searchQuery);
+      } else if (_searchType == 'transaction') {
+        await _searchByTransactionId(searchQuery);
       }
     } catch (e) {
       print('Search error: $e');
@@ -164,6 +166,95 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     }
   }
 
+  Future<void> _searchByTransactionId(String transactionId) async {
+    // Search across all batches using collectionGroup query
+    // First try searching by bankTransactionId field
+    var registrationsSnapshot =
+        await FirebaseFirestore.instance
+            .collectionGroup('registrations')
+            .where('bankTransactionId', isEqualTo: transactionId)
+            .get();
+
+    print(
+      'Found ${registrationsSnapshot.docs.length} registrations with bankTransactionId: $transactionId',
+    );
+
+    // If not found, search in all registrations and check paymentData
+    if (registrationsSnapshot.docs.isEmpty) {
+      print('Searching in paymentData.tran_id and paymentData.bank_tran_id...');
+      final allRegistrations =
+          await FirebaseFirestore.instance
+              .collectionGroup('registrations')
+              .get();
+
+      for (var doc in allRegistrations.docs) {
+        final data = doc.data();
+        final paymentData = data['paymentData'];
+
+        // Check if paymentData contains the transaction ID
+        if (paymentData != null && paymentData is Map<String, dynamic>) {
+          // Check both tran_id and bank_tran_id fields
+          final tranId = paymentData['tran_id']?.toString() ?? '';
+          final bankTranId = paymentData['bank_tran_id']?.toString() ?? '';
+          
+          // Check if either field matches the transaction ID
+          final tranIdMatch = tranId.isNotEmpty && 
+              (tranId == transactionId ||
+               tranId.contains(transactionId) ||
+               transactionId.contains(tranId));
+          
+          final bankTranIdMatch = bankTranId.isNotEmpty && 
+              (bankTranId == transactionId ||
+               bankTranId.contains(transactionId) ||
+               transactionId.contains(bankTranId));
+          
+          if (tranIdMatch || bankTranIdMatch) {
+            final batchId = doc.reference.parent.parent?.id;
+            data['batch'] = batchId;
+            data['id'] = doc.id;
+
+            final matchedField = tranIdMatch ? 'tran_id' : 'bank_tran_id';
+            print(
+              'Found user: ${data['name']} with bank transaction ID in paymentData.$matchedField',
+            );
+
+            setState(() {
+              _searchResult = data;
+              _isLoading = false;
+            });
+            return;
+          }
+        }
+      }
+
+      // Still not found
+      setState(() {
+        _errorMessage =
+            'No user found with bank transaction ID: $transactionId';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Found by bankTransactionId field
+    final registrationDoc = registrationsSnapshot.docs.first;
+    final userData = registrationDoc.data();
+
+    // Get the batch ID from the document path
+    final batchId = registrationDoc.reference.parent.parent?.id;
+    userData['batch'] = batchId;
+    userData['id'] = registrationDoc.id;
+
+    print(
+      'Found user: ${userData['name']} with bank transaction ID: $transactionId',
+    );
+
+    setState(() {
+      _searchResult = userData;
+      _isLoading = false;
+    });
+  }
+
   void _viewUserDetails() {
     if (_searchResult != null) {
       showDialog(
@@ -196,7 +287,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Search User by Phone Number',
+                        'Search User',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -205,33 +296,48 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                       ),
                       const SizedBox(height: 16),
                       // Search Type Selector
-                      Row(
+                      Column(
                         children: [
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: const Text('Phone Number'),
-                              value: 'phone',
-                              groupValue: _searchType,
-                              onChanged: (value) {
-                                setState(() {
-                                  _searchType = value!;
-                                  _searchController.clear();
-                                });
-                              },
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RadioListTile<String>(
+                                  title: const Text('Phone Number'),
+                                  value: 'phone',
+                                  groupValue: _searchType,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchType = value!;
+                                      _searchController.clear();
+                                    });
+                                  },
+                                ),
+                              ),
+                              Expanded(
+                                child: RadioListTile<String>(
+                                  title: const Text('Form Number'),
+                                  value: 'form',
+                                  groupValue: _searchType,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchType = value!;
+                                      _searchController.clear();
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: const Text('Form Number'),
-                              value: 'form',
-                              groupValue: _searchType,
-                              onChanged: (value) {
-                                setState(() {
-                                  _searchType = value!;
-                                  _searchController.clear();
-                                });
-                              },
-                            ),
+                          RadioListTile<String>(
+                            title: const Text('Bank Transaction ID'),
+                            value: 'transaction',
+                            groupValue: _searchType,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchType = value!;
+                                _searchController.clear();
+                              });
+                            },
                           ),
                         ],
                       ),
@@ -245,18 +351,24 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                                 labelText:
                                     _searchType == 'phone'
                                         ? 'Phone Number'
-                                        : 'Form Number',
+                                        : _searchType == 'form'
+                                        ? 'Form Number'
+                                        : 'Bank Transaction ID',
                                 border: const OutlineInputBorder(),
                                 prefixIcon: Icon(
                                   _searchType == 'phone'
                                       ? Icons.phone
-                                      : Icons.numbers,
+                                      : _searchType == 'form'
+                                      ? Icons.numbers
+                                      : Icons.receipt_long,
                                 ),
                               ),
                               keyboardType:
                                   _searchType == 'phone'
                                       ? TextInputType.phone
-                                      : TextInputType.number,
+                                      : _searchType == 'form'
+                                      ? TextInputType.number
+                                      : TextInputType.text,
                               onFieldSubmitted: (_) => _searchUser(),
                             ),
                           ),
@@ -393,6 +505,25 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                             _searchResult!['formSerialNumber']?.toString() ??
                                 'N/A',
                           ),
+                          // Show Bank Transaction ID if available
+                          if (_searchResult!['bankTransactionId'] != null ||
+                              (_searchResult!['paymentData'] != null &&
+                                  (_searchResult!['paymentData']
+                                          ['bank_tran_id'] !=
+                                      null ||
+                                  _searchResult!['paymentData']
+                                          ['tran_id'] !=
+                                      null))) ...[
+                            _buildInfoRow(
+                              'Bank Transaction ID',
+                              _searchResult!['bankTransactionId'] ??
+                                  _searchResult!['paymentData']
+                                      ['bank_tran_id'] ??
+                                  _searchResult!['paymentData']
+                                      ['tran_id'] ??
+                                  'N/A',
+                            ),
+                          ],
 
                           // Payment Approval Section
                           if (_searchResult!['paymentStatus'] == 'pending') ...[
@@ -572,7 +703,8 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Search for a user by phone number',
+                            'Search for a user by phone number, form number, or bank transaction ID',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey.shade600,

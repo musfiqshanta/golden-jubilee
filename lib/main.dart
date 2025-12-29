@@ -198,6 +198,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
   // Countdown durations
   Duration _registrationCountdown = Duration.zero;
   Duration _jubileeCountdown = Duration.zero;
+  Duration _eidCountdown = Duration.zero;
 
   // Statistics data - loaded once when page loads
   int _totalRegistrations = 0;
@@ -245,6 +246,12 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     _countdownService.jubileeCountdownStream.listen((duration) {
       setState(() {
         _jubileeCountdown = duration;
+      });
+    });
+
+    _countdownService.eidCountdownStream.listen((duration) {
+      setState(() {
+        _eidCountdown = duration;
       });
     });
 
@@ -457,6 +464,16 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                   ),
                   textAlign: TextAlign.center,
                 ),
+                Text(
+                  'ঈদের দ্বিতীয় দিন',
+                  style: TextStyle(
+                    fontSize:
+                        MediaQuery.of(context).size.width < 600 ? 16.0 : 20.0,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 20),
 
                 // Registration Remaining Notice
@@ -610,6 +627,14 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                           ElevatedButton(
                             onPressed: () {
                               Get.toNamed('/registration');
+                              // Get.snackbar(
+                              //   'নিবন্ধন বন্ধ',
+                              //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
+                              //   backgroundColor: Colors.red,
+                              //   colorText: Colors.white,
+                              //   duration: const Duration(seconds: 4),
+                              //   snackPosition: SnackPosition.TOP,
+                              // );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -680,6 +705,14 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                             cursor: SystemMouseCursors.click,
                             child: ElevatedButton(
                               onPressed: () {
+                                // Get.snackbar(
+                                //   'নিবন্ধন বন্ধ',
+                                //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
+                                //   backgroundColor: Colors.red,
+                                //   colorText: Colors.white,
+                                //   duration: const Duration(seconds: 4),
+                                //   snackPosition: SnackPosition.TOP,
+                                // );
                                 Get.toNamed('/registration');
                               },
                               style: ElevatedButton.styleFrom(
@@ -1057,10 +1090,13 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
     final labelSize = isMobile ? 10.0 : (isWide ? 14.0 : 12.0);
     final spacing = isMobile ? 8.0 : 20.0;
     final titleSize = isMobile ? 18.0 : (isWide ? 32.0 : 22.0);
-    final days = _jubileeCountdown.inDays;
-    final hours = _jubileeCountdown.inHours % 24;
-    final minutes = _jubileeCountdown.inMinutes % 60;
-    final seconds = _jubileeCountdown.inSeconds % 60;
+
+    // Jubilee countdown
+    final jubileeDays = _jubileeCountdown.inDays;
+    final jubileeHours = _jubileeCountdown.inHours % 24;
+    final jubileeMinutes = _jubileeCountdown.inMinutes % 60;
+    final jubileeSeconds = _jubileeCountdown.inSeconds % 60;
+
     return Container(
       padding: EdgeInsets.symmetric(
         vertical: isMobile ? 30.0 : 40.0,
@@ -1078,13 +1114,24 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
             ),
             textAlign: TextAlign.center,
           ),
+
+          // Jubilee countdown
+          Text(
+            'ঈদের দ্বিতীয় দিন',
+            style: TextStyle(
+              fontSize: isMobile ? 16.0 : 20.0,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF8B6914),
+            ),
+            textAlign: TextAlign.center,
+          ),
           SizedBox(height: isMobile ? 20.0 : 30.0),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildCountdownCard(
                 'দিন',
-                days.toString(),
+                jubileeDays.toString(),
                 cardWidth,
                 cardHeight,
                 textSize,
@@ -1096,7 +1143,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
               SizedBox(width: spacing),
               _buildCountdownCard(
                 'ঘন্টা',
-                hours.toString().padLeft(2, '0'),
+                jubileeHours.toString().padLeft(2, '0'),
                 cardWidth,
                 cardHeight,
                 textSize,
@@ -1108,7 +1155,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
               SizedBox(width: spacing),
               _buildCountdownCard(
                 'মিনিট',
-                minutes.toString().padLeft(2, '0'),
+                jubileeMinutes.toString().padLeft(2, '0'),
                 cardWidth,
                 cardHeight,
                 textSize,
@@ -1120,7 +1167,7 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
               SizedBox(width: spacing),
               _buildCountdownCard(
                 'সেকেন্ড',
-                seconds.toString().padLeft(2, '0'),
+                jubileeSeconds.toString().padLeft(2, '0'),
                 cardWidth,
                 cardHeight,
                 textSize,
@@ -1281,25 +1328,25 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                 'উদ্বোধনী অনুষ্ঠান',
                 '৫০ বছর পূর্তি উদযাপনের জাঁকজমকপূর্ণ উদ্বোধন',
                 Icons.event,
-                ' ফেব্রুয়ারি , ২০২৬',
+                ' মার্চ , ২০২৬',
               ),
               _buildEventCard(
                 'গালা লাঞ্চ',
                 ' লাঞ্চ, সুস্বাদু খাবার ও বিনোদন',
                 Icons.restaurant,
-                'ফেব্রুয়ারি , ২০২৬',
+                'মার্চ , ২০২৬',
               ),
               _buildEventCard(
                 'সাংস্কৃতিক অনুষ্ঠান',
                 'আমাদের সমৃদ্ধ ঐতিহ্য ও সাংস্কৃতিক বৈচিত্র্য উপস্থাপন',
                 Icons.music_note,
-                'ফেব্রুয়ারি, ২০২৬',
+                'মার্চ, ২০২৬',
               ),
               _buildEventCard(
                 'সমাপনী অনুষ্ঠান',
                 'সুবর্ণজয়ন্তী উদযাপনের স্মরণীয় সমাপ্তি',
                 Icons.celebration,
-                'ফেব্রুয়ারি, ২০২৬',
+                'মার্চ, ২০২৬',
               ),
             ],
           ),

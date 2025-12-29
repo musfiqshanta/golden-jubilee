@@ -983,7 +983,8 @@ class RegistrationController extends GetxController {
       final isRunning = isRunningStudent.value;
       final batch =
           isRunning ? selectedFinalClass.value : selectedSscPassingYear.value;
-      final phone = mobileController.text.trim();
+      // Normalize phone number to remove all whitespace and hidden characters
+      final phone = _normalizePhoneNumber(mobileController.text);
 
       // Upload photo first (only if photo is provided)
       String? photoUrl;
@@ -1166,6 +1167,31 @@ class RegistrationController extends GetxController {
     }
   }
 
+  /// Normalize phone number by removing all types of whitespace and hidden characters
+  String _normalizePhoneNumber(String phone) {
+    if (phone.isEmpty) return phone;
+
+    // Remove all Unicode whitespace characters including:
+    // - Regular spaces
+    // - Non-breaking spaces (\u00A0)
+    // - Zero-width spaces (\u200B)
+    // - Zero-width non-breaking spaces (\uFEFF)
+    // - And all other Unicode whitespace
+    String normalized = phone.trim();
+
+    // Remove all Unicode whitespace characters
+    normalized = normalized.replaceAll(
+      RegExp(r'[\s\u00A0\u200B\u200C\u200D\uFEFF]'),
+      '',
+    );
+
+    // Remove any other invisible/formatting characters that might have been accidentally inserted
+    // Keep only digits
+    normalized = normalized.replaceAll(RegExp(r'[^\d]'), '');
+
+    return normalized;
+  }
+
   Map<String, dynamic> _collectRegistrationData(String batch) {
     // Calculate total payable amount
     final bool isRunning = isRunningStudent.value;
@@ -1201,7 +1227,7 @@ class RegistrationController extends GetxController {
       'bloodGroup': selectedBloodGroup.value,
       'dateOfBirth': selectedDateOfBirth.value?.toIso8601String(),
       'nationalId': nationalIdController.text.trim(),
-      'mobile': mobileController.text.trim(),
+      'mobile': _normalizePhoneNumber(mobileController.text),
       'email': emailController.text.trim(),
       'permanentAddress': permanentAddressController.text.trim(),
       'presentAddress': presentAddressController.text.trim(),
