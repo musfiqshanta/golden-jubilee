@@ -12,6 +12,8 @@ import 'online_payment_users_screen.dart';
 import 'manual_approval_users_screen.dart';
 import 'date_filter_screen.dart';
 import 'admin_registration_screen.dart';
+import 'tshirt_size_users_screen.dart';
+import 'guests_by_batch_screen.dart';
 import '../../config/app_config.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -35,6 +37,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _onlinePaymentAmount = 0.0;
   double _manualApprovalAmount = 0.0;
   bool _isUsingEstimatedData = false;
+
+  // T-shirt size statistics
+  Map<String, int> _tshirtSizeStats = {};
+  bool _isTshirtSizeExpanded = false;
 
   // Initialize data once when widget is created
   @override
@@ -64,6 +70,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Load payment breakdown data
       await _loadPaymentBreakdownData();
 
+      // Load t-shirt size statistics
+      final tshirtSizeStats = await CounterService().getTshirtSizeStatistics();
+
       setState(() {
         _cachedData = {
           'totalRegistrations': stats['totalRegistrations'],
@@ -73,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'totalCollections': stats['totalCollections'],
           'totalApprovedUsers': stats['totalApprovedUsers'],
         };
+        _tshirtSizeStats = tshirtSizeStats;
         _isLoading = false;
       });
     } catch (e) {
@@ -298,6 +308,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             // Payment Breakdown Section
             _buildPaymentBreakdownSection(),
+
+            const SizedBox(height: 32),
+
+            // T-shirt Size Statistics Section
+            _buildTshirtSizeSection(),
 
             const SizedBox(height: 32),
 
@@ -551,11 +566,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isClickable: true,
         ),
       ),
-      // Total Guest
-      _statCard(
-        'Total Guest',
-        (_cachedData['totalGuests'] ?? 0).toString(),
-        Icons.group_add,
+      // Total Guest (clickable)
+      GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const GuestsByBatchScreen(),
+            ),
+          );
+        },
+        child: _statCard(
+          'Total Guest',
+          (_cachedData['totalGuests'] ?? 0).toString(),
+          Icons.group_add,
+          isClickable: true,
+        ),
       ),
       // Total Donation Requests (clickable)
       GestureDetector(
@@ -1010,5 +1035,185 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  /// Build t-shirt size statistics section
+  Widget _buildTshirtSizeSection() {
+    final totalTshirts = _tshirtSizeStats.values.fold<int>(
+      0,
+      (sum, count) => sum + count,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with expand/collapse button
+            Row(
+              children: [
+                const Icon(Icons.checkroom, color: Color(0xFFD4AF37), size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'T-shirt Size Statistics (Approved Users)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'Total: $totalTshirts',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isTshirtSizeExpanded = !_isTshirtSizeExpanded;
+                    });
+                  },
+                  icon: Icon(
+                    _isTshirtSizeExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+              ],
+            ),
+
+            // Expandable content
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: _isTshirtSizeExpanded ? null : 0,
+              child: _isTshirtSizeExpanded
+                  ? Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 16),
+
+                        // Size cards in a grid
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            int crossAxisCount = 2;
+                            if (constraints.maxWidth > 600) {
+                              crossAxisCount = 5;
+                            } else if (constraints.maxWidth > 400) {
+                              crossAxisCount = 3;
+                            }
+
+                            return GridView.count(
+                              crossAxisCount: crossAxisCount,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 1.2,
+                              children: ['S', 'M', 'L', 'XL', 'XXL']
+                                  .map((size) => _buildTshirtSizeCard(
+                                        size,
+                                        _tshirtSizeStats[size] ?? 0,
+                                        totalTshirts,
+                                      ))
+                                  .toList(),
+                            );
+                          },
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build individual t-shirt size card
+  Widget _buildTshirtSizeCard(String size, int count, int total) {
+    final percentage = total > 0 ? (count / total * 100) : 0.0;
+    final color = _getTshirtSizeColor(size);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TshirtSizeUsersScreen(tshirtSize: size),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                size,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                count.toString(),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${percentage.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: color.withOpacity(0.8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: color,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Get color for t-shirt size
+  Color _getTshirtSizeColor(String size) {
+    switch (size.toUpperCase()) {
+      case 'S':
+        return Colors.blue;
+      case 'M':
+        return Colors.green;
+      case 'L':
+        return Colors.orange;
+      case 'XL':
+        return Colors.purple;
+      case 'XXL':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }

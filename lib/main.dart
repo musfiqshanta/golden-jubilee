@@ -624,34 +624,34 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              Get.toNamed('/registration');
-                              // Get.snackbar(
-                              //   'নিবন্ধন বন্ধ',
-                              //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
-                              //   backgroundColor: Colors.red,
-                              //   colorText: Colors.white,
-                              //   duration: const Duration(seconds: 4),
-                              //   snackPosition: SnackPosition.TOP,
-                              // );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFFD4AF37),
-                              padding: buttonPadding,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                            child: Text(
-                              'নিবন্ধন করুন',
-                              style: TextStyle(
-                                fontSize: buttonFontSize,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
+                          // ElevatedButton(
+                          //   onPressed: () {
+                          //     Get.toNamed('/registration');
+                          //     // Get.snackbar(
+                          //     //   'নিবন্ধন বন্ধ',
+                          //     //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
+                          //     //   backgroundColor: Colors.red,
+                          //     //   colorText: Colors.white,
+                          //     //   duration: const Duration(seconds: 4),
+                          //     //   snackPosition: SnackPosition.TOP,
+                          //     // );
+                          //   },
+                          //   style: ElevatedButton.styleFrom(
+                          //     backgroundColor: Colors.white,
+                          //     foregroundColor: const Color(0xFFD4AF37),
+                          //     padding: buttonPadding,
+                          //     shape: RoundedRectangleBorder(
+                          //       borderRadius: BorderRadius.circular(30),
+                          //     ),
+                          //   ),
+                          //   child: Text(
+                          //     'নিবন্ধন করুন',
+                          //     style: TextStyle(
+                          //       fontSize: buttonFontSize,
+                          //       fontWeight: FontWeight.bold,
+                          //     ),
+                          //   ),
+                          // ),
                           const SizedBox(height: 12),
                           ElevatedButton(
                             onPressed: () {
@@ -701,37 +701,37 @@ class _GoldenJubileeHomePageState extends State<GoldenJubileeHomePage>
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                // Get.snackbar(
-                                //   'নিবন্ধন বন্ধ',
-                                //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
-                                //   backgroundColor: Colors.red,
-                                //   colorText: Colors.white,
-                                //   duration: const Duration(seconds: 4),
-                                //   snackPosition: SnackPosition.TOP,
-                                // );
-                                Get.toNamed('/registration');
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFFD4AF37),
-                                padding: buttonPadding,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                              ),
-                              child: Text(
-                                'নিবন্ধন করুন',
-                                style: TextStyle(
-                                  fontSize: buttonFontSize,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
+                          // MouseRegion(
+                          //   cursor: SystemMouseCursors.click,
+                          //   child: ElevatedButton(
+                          //     onPressed: () {
+                          //       // Get.snackbar(
+                          //       //   'নিবন্ধন বন্ধ',
+                          //       //   ' নিবন্ধন বর্তমানে বন্ধ আছে।',
+                          //       //   backgroundColor: Colors.red,
+                          //       //   colorText: Colors.white,
+                          //       //   duration: const Duration(seconds: 4),
+                          //       //   snackPosition: SnackPosition.TOP,
+                          //       // );
+                          //       Get.toNamed('/registration');
+                          //     },
+                          //     style: ElevatedButton.styleFrom(
+                          //       backgroundColor: Colors.white,
+                          //       foregroundColor: const Color(0xFFD4AF37),
+                          //       padding: buttonPadding,
+                          //       shape: RoundedRectangleBorder(
+                          //         borderRadius: BorderRadius.circular(30),
+                          //       ),
+                          //     ),
+                          //     child: Text(
+                          //       'নিবন্ধন করুন',
+                          //       style: TextStyle(
+                          //         fontSize: buttonFontSize,
+                          //         fontWeight: FontWeight.bold,
+                          //       ),
+                          //     ),
+                          //   ),
+                          // ),
                           const SizedBox(width: 20),
                           MouseRegion(
                             cursor: SystemMouseCursors.click,

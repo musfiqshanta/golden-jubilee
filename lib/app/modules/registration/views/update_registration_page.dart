@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:suborno_joyonti/config/collection_names.dart';
@@ -1723,6 +1724,11 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
                   ),
                 ]),
 
+                const SizedBox(height: 20),
+
+                // Transaction ID Section
+                _buildTransactionIdSection(),
+
                 const SizedBox(height: 30),
 
                 // Action Buttons
@@ -2022,5 +2028,395 @@ class _UpdateRegistrationPageState extends State<UpdateRegistrationPage> {
       return postcodeMatch.group(1);
     }
     return null; // Will use default "1209"
+  }
+
+  // Format date from timestamp string
+  String _formatDate(String? timestamp) {
+    if (timestamp == null || timestamp.isEmpty) return 'Not available';
+    try {
+      final date = DateTime.parse(timestamp);
+      // Format: DD/MM/YYYY HH:MM
+      final day = date.day.toString().padLeft(2, '0');
+      final month = date.month.toString().padLeft(2, '0');
+      final year = date.year.toString();
+      final hour = date.hour.toString().padLeft(2, '0');
+      final minute = date.minute.toString().padLeft(2, '0');
+      return '$day/$month/$year $hour:$minute';
+    } catch (e) {
+      return timestamp; // Fallback to raw string
+    }
+  }
+
+  // Check if registration is online or offline
+  bool _isOnlineRegistration(Map<String, dynamic> data) {
+    // Check if paymentData exists and contains online payment indicators
+    final paymentData = data['paymentData'];
+    if (paymentData != null && paymentData is Map<String, dynamic>) {
+      // Check for SSLCommerz indicators in paymentData
+      final paymentMethod =
+          paymentData['payment_method'] ?? paymentData['paymentMethod'] ?? '';
+      final tranId = paymentData['tran_id'] ?? '';
+      final valId = paymentData['val_id'] ?? '';
+      final status = paymentData['status'] ?? '';
+      final storeId = paymentData['store_id'] ?? '';
+
+      // If any of these SSLCommerz fields exist, it's an online payment
+      if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+          paymentMethod.toLowerCase().contains('bkash') ||
+          paymentMethod.toLowerCase().contains('mobilebanking') ||
+          tranId.isNotEmpty ||
+          valId.isNotEmpty ||
+          status.toLowerCase() == 'valid' ||
+          storeId.isNotEmpty) {
+        return true;
+      }
+    }
+
+    // Fallback to original logic for backward compatibility
+    final paymentMethod = data['paymentMethod'] ?? data['payment_method'] ?? '';
+    final paymentType = data['paymentType'] ?? data['payment_type'] ?? '';
+    final sslcommerz = data['sslcommerz'] ?? '';
+    final isOnlinePaymentField =
+        data['isOnlinePayment'] ?? data['is_online_payment'] ?? false;
+    final gateway = data['gateway'] ?? '';
+
+    // Check if it's an online payment
+    if (paymentMethod.toLowerCase().contains('sslcommerz') ||
+        paymentMethod.toLowerCase().contains('online') ||
+        paymentMethod.toLowerCase().contains('bkash') ||
+        paymentType.toLowerCase().contains('sslcommerz') ||
+        paymentType.toLowerCase().contains('online') ||
+        sslcommerz.toString().toLowerCase().contains('true') ||
+        isOnlinePaymentField == true ||
+        gateway.toLowerCase().contains('sslcommerz') ||
+        gateway.toLowerCase().contains('online')) {
+      return true;
+    }
+
+    // Check for transaction IDs
+    final transactionId =
+        data['transactionId'] ??
+        data['transaction_id'] ??
+        data['sslcommerzTransactionId'] ??
+        '';
+    final paymentId = data['paymentId'] ?? data['payment_id'] ?? '';
+    if (transactionId.isNotEmpty || paymentId.isNotEmpty) {
+      return true;
+    }
+
+    // Check for SSLCommerz specific fields
+    final sslcommerzStatus = data['sslcommerzStatus'] ?? '';
+    final sslcommerzTranId = data['sslcommerzTranId'] ?? '';
+    final sslcommerzValId = data['sslcommerzValId'] ?? '';
+    final sslcommerzAmount = data['sslcommerzAmount'] ?? '';
+
+    if (sslcommerzStatus.isNotEmpty ||
+        sslcommerzTranId.isNotEmpty ||
+        sslcommerzValId.isNotEmpty ||
+        sslcommerzAmount.isNotEmpty) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Build Transaction ID Section
+  Widget _buildTransactionIdSection() {
+    // Extract transaction IDs from registration data
+    final List<Map<String, String>> transactions = [];
+    
+    // Get paymentData from widget.registrationData
+    final paymentData = widget.registrationData['paymentData'];
+    
+    // Determine registration type
+    final isOnline = _isOnlineRegistration(widget.registrationData);
+    final registrationType = isOnline ? 'Online Registration' : 'Offline Registration';
+    final registrationTypeIcon = isOnline ? Icons.cloud_done : Icons.person_add;
+    final registrationTypeColor = isOnline ? Colors.green : Colors.orange;
+    
+    if (paymentData != null) {
+      // Handle single paymentData object
+      if (paymentData is Map<String, dynamic>) {
+        final tranId = paymentData['tran_id']?.toString() ?? '';
+        final valId = paymentData['val_id']?.toString() ?? '';
+        final bankTranId = paymentData['bank_tran_id']?.toString() ?? '';
+        
+        if (tranId.isNotEmpty || valId.isNotEmpty || bankTranId.isNotEmpty) {
+          transactions.add({
+            'tran_id': tranId,
+            'val_id': valId,
+            'bank_tran_id': bankTranId,
+          });
+        }
+      }
+      // Handle multiple paymentData (array)
+      else if (paymentData is List) {
+        for (var payment in paymentData) {
+          if (payment is Map<String, dynamic>) {
+            final tranId = payment['tran_id']?.toString() ?? '';
+            final valId = payment['val_id']?.toString() ?? '';
+            final bankTranId = payment['bank_tran_id']?.toString() ?? '';
+            
+            if (tranId.isNotEmpty || valId.isNotEmpty || bankTranId.isNotEmpty) {
+              transactions.add({
+                'tran_id': tranId,
+                'val_id': valId,
+                'bank_tran_id': bankTranId,
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    // Also check for legacy transaction ID fields
+    final legacyTranId = widget.registrationData['transactionId']?.toString() ?? 
+                         widget.registrationData['transaction_id']?.toString() ?? 
+                         widget.registrationData['sslcommerzTransactionId']?.toString() ?? '';
+    
+    if (legacyTranId.isNotEmpty && transactions.isEmpty) {
+      transactions.add({
+        'tran_id': legacyTranId,
+        'val_id': '',
+        'bank_tran_id': '',
+      });
+    }
+    
+    // Get registration date
+    String registrationDate = '';
+    final regTimestamp = widget.registrationData['registrationTimestamp']?.toString() ?? 
+                         widget.registrationData['timestamp']?.toString() ?? '';
+    
+    if (regTimestamp.isNotEmpty) {
+      registrationDate = _formatDate(regTimestamp);
+    }
+    
+    // If no transactions and no registration date, don't show the section
+    if (transactions.isEmpty && registrationDate.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return _sectionCard('Transaction Information', Icons.receipt_long, [
+      // Show registration type (Online/Offline)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: registrationTypeColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: registrationTypeColor.withOpacity(0.3),
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                registrationTypeIcon,
+                color: registrationTypeColor,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Registration Type',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      registrationType,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: registrationTypeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      
+      // Show registration date
+      if (registrationDate.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Registration Date',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF8B6914),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: SelectableText(
+                        registrationDate,
+                        style: const TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                icon: const Icon(Icons.copy, color: Color(0xFFD4AF37)),
+                tooltip: 'Copy Registration Date',
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: registrationDate));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Registration Date copied to clipboard'),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        if (transactions.isNotEmpty) ...[
+          const Divider(),
+          const SizedBox(height: 16),
+        ],
+      ],
+      ...transactions.asMap().entries.map((entry) {
+        final index = entry.key;
+        final transaction = entry.value;
+        final tranId = transaction['tran_id'] ?? '';
+        final valId = transaction['val_id'] ?? '';
+        final bankTranId = transaction['bank_tran_id'] ?? '';
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (transactions.length > 1) ...[
+              Text(
+                'Transaction ${index + 1}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B6914),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (tranId.isNotEmpty)
+              _buildTransactionIdRow(
+                'Transaction ID',
+                tranId,
+                'tran_id',
+              ),
+            if (valId.isNotEmpty)
+              _buildTransactionIdRow(
+                'Validation ID',
+                valId,
+                'val_id',
+              ),
+            if (bankTranId.isNotEmpty)
+              _buildTransactionIdRow(
+                'Bank Transaction ID',
+                bankTranId,
+                'bank_tran_id',
+              ),
+            if (index < transactions.length - 1) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+            ],
+          ],
+        );
+      }).toList(),
+    ]);
+  }
+
+  // Build Transaction ID Row with Copy Button
+  Widget _buildTransactionIdRow(String label, String value, String type) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8B6914),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: SelectableText(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.copy, color: Color(0xFFD4AF37)),
+            tooltip: 'Copy $label',
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: value));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$label copied to clipboard'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -30,7 +30,12 @@ class UserService {
   }
 
   Future<int> getTotalGuests() async {
-    final snapshot = await _firestore.collectionGroup('registrations').get();
+    // Only count guests from approved users
+    final snapshot =
+        await _firestore
+            .collectionGroup('registrations')
+            .where('paymentStatus', isEqualTo: 'approved')
+            .get();
     int totalGuests = 0;
     for (var doc in snapshot.docs) {
       final data = doc.data();

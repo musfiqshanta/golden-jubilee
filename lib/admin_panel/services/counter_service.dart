@@ -19,30 +19,25 @@ class CounterService {
     }
   }
 
-  // Get total guests count directly from collections
+  // Get total guests count directly from collections (only approved users)
   Future<int> getTotalGuestsCount() async {
     try {
-      final spouseCountQuery =
-          _firestore
+      // Only count guests from approved users
+      final snapshot =
+          await _firestore
               .collectionGroup('registrations')
-              .aggregate(sum('spouseCount'))
+              .where('paymentStatus', isEqualTo: 'approved')
               .get();
 
-      final childCountQuery =
-          _firestore
-              .collectionGroup('registrations')
-              .aggregate(sum('childCount'))
-              .get();
+      int totalGuests = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        totalGuests +=
+            ((data['spouseCount'] ?? 0) as num).toInt() +
+            ((data['childCount'] ?? 0) as num).toInt();
+      }
 
-      final results = await Future.wait([spouseCountQuery, childCountQuery]);
-
-      final spouseCount = results[0].getSum('spouseCount');
-      final childCount = results[1].getSum('childCount');
-
-      final totalGuests =
-          (spouseCount ?? 0).toInt() + (childCount ?? 0).toInt();
-
-      print('Total guests from efficient filtering: $totalGuests');
+      print('Total guests from approved users: $totalGuests');
       return totalGuests;
     } catch (e) {
       print('Error getting total guests count: $e');
@@ -127,28 +122,28 @@ class CounterService {
       final snapshot = await _firestore.collectionGroup('registrations').get();
 
       int totalRegistrations = snapshot.docs.length;
-      int totalGuests = 0;
+      int totalGuests = 0; // Only count guests from approved users
       int totalApprovedUsers = 0;
       double totalCollections = 0;
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
 
-        // Count guests
-        totalGuests +=
-            ((data['spouseCount'] ?? 0) as num).toInt() +
-            ((data['childCount'] ?? 0) as num).toInt();
-
         // Count approved users and collections
         if (data['paymentStatus'] == 'approved') {
           totalApprovedUsers++;
           totalCollections += (data['totalPayable'] ?? 0) as num;
+          
+          // Only count guests from approved users
+          totalGuests +=
+              ((data['spouseCount'] ?? 0) as num).toInt() +
+              ((data['childCount'] ?? 0) as num).toInt();
         }
       }
 
       print('✅ All statistics calculated from Firebase:');
       print('   Total Registrations: $totalRegistrations');
-      print('   Total Guests: $totalGuests');
+      print('   Total Guests (Approved Users Only): $totalGuests');
       print('   Total Approved Users: $totalApprovedUsers');
       print('   Total Collections: ৳$totalCollections');
 
@@ -165,6 +160,61 @@ class CounterService {
         'totalGuests': 0,
         'totalApprovedUsers': 0,
         'totalCollections': 0.0,
+      };
+    }
+  }
+
+  // Get t-shirt size statistics (only from approved users)
+  Future<Map<String, int>> getTshirtSizeStatistics() async {
+    try {
+      print('👕 Getting t-shirt size statistics from approved users...');
+
+      // Get only approved registrations
+      final snapshot =
+          await _firestore
+              .collectionGroup('registrations')
+              .where('paymentStatus', isEqualTo: 'approved')
+              .get();
+
+      // Initialize size counts
+      final sizeCounts = <String, int>{
+        'S': 0,
+        'M': 0,
+        'L': 0,
+        'XL': 0,
+        'XXL': 0,
+      };
+
+      // Count t-shirt sizes
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final tshirtSize = data['tshirtSize']?.toString().toUpperCase() ?? '';
+        
+        // Handle variations (e.g., 'XL', 'xl', 'Xl')
+        if (sizeCounts.containsKey(tshirtSize)) {
+          sizeCounts[tshirtSize] = (sizeCounts[tshirtSize] ?? 0) + 1;
+        } else if (tshirtSize.isNotEmpty) {
+          // Handle any other sizes that might exist
+          sizeCounts[tshirtSize] = (sizeCounts[tshirtSize] ?? 0) + 1;
+        }
+      }
+
+      print('✅ T-shirt size statistics:');
+      sizeCounts.forEach((size, count) {
+        if (count > 0 || ['S', 'M', 'L', 'XL', 'XXL'].contains(size)) {
+          print('   $size: $count');
+        }
+      });
+
+      return sizeCounts;
+    } catch (e) {
+      print('Error getting t-shirt size statistics: $e');
+      return {
+        'S': 0,
+        'M': 0,
+        'L': 0,
+        'XL': 0,
+        'XXL': 0,
       };
     }
   }
@@ -274,19 +324,21 @@ class CounterService {
           await _firestore.collectionGroup('registrations').get();
       final totalRegistrations = registrationsSnapshot.docs.length;
 
-      int totalGuests = 0;
+      int totalGuests = 0; // Only count guests from approved users
       int totalApprovedUsers = 0;
       double totalCollections = 0;
 
       for (var doc in registrationsSnapshot.docs) {
         final data = doc.data();
-        totalGuests +=
-            ((data['spouseCount'] ?? 0) as num).toInt() +
-            ((data['childCount'] ?? 0) as num).toInt();
 
         if (data['paymentStatus'] == 'approved') {
           totalApprovedUsers++;
           totalCollections += (data['totalPayable'] ?? 0) as num;
+          
+          // Only count guests from approved users
+          totalGuests +=
+              ((data['spouseCount'] ?? 0) as num).toInt() +
+              ((data['childCount'] ?? 0) as num).toInt();
         }
       }
 

@@ -51,15 +51,18 @@ class CounterInitializer {
       final totalRegistrations = registrationsSnapshot.docs.length;
       print('📊 Found $totalRegistrations registrations');
 
-      // Count total guests
+      // Count total guests (only from approved users)
       int totalGuests = 0;
       for (var doc in registrationsSnapshot.docs) {
         final data = doc.data();
-        final spouseCount = (data['spouseCount'] ?? 0) as num;
-        final childCount = (data['childCount'] ?? 0) as num;
-        totalGuests += spouseCount.toInt() + childCount.toInt();
+        // Only count guests from approved users
+        if (data['paymentStatus'] == 'approved') {
+          final spouseCount = (data['spouseCount'] ?? 0) as num;
+          final childCount = (data['childCount'] ?? 0) as num;
+          totalGuests += spouseCount.toInt() + childCount.toInt();
+        }
       }
-      print('👥 Total guests calculated: $totalGuests');
+      print('👥 Total guests calculated (approved users only): $totalGuests');
 
       // Count total collections and approved users
       double totalCollections = 0;
@@ -134,23 +137,25 @@ class CounterInitializer {
         '   Actual total registrations: ${registrationsSnapshot.docs.length}',
       );
 
-      int actualGuests = 0;
+      int actualGuests = 0; // Only count guests from approved users
       int actualApproved = 0;
       double actualCollections = 0;
 
       for (var doc in registrationsSnapshot.docs) {
         final data = doc.data();
-        actualGuests +=
-            ((data['spouseCount'] ?? 0) as num).toInt() +
-            ((data['childCount'] ?? 0) as num).toInt();
 
         if (data['paymentStatus'] == 'approved') {
           actualApproved++;
           actualCollections += (data['totalPayable'] ?? 0) as num;
+          
+          // Only count guests from approved users
+          actualGuests +=
+              ((data['spouseCount'] ?? 0) as num).toInt() +
+              ((data['childCount'] ?? 0) as num).toInt();
         }
       }
 
-      print('   Actual total guests: $actualGuests');
+      print('   Actual total guests (approved users only): $actualGuests');
       print('   Actual total approved: $actualApproved');
       print('   Actual total collections: ৳$actualCollections');
     } catch (e) {
