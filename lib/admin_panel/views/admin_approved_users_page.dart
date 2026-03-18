@@ -181,19 +181,53 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
   final String batchId;
   const _ApprovedBatchDetailsPage({required this.batchId});
 
+  String _sanitizeCellValue(Object? value) {
+    final raw = (value ?? '').toString();
+    // Keep TSV/Excel paste safe: no tabs/newlines inside cells.
+    return raw
+        .replaceAll('\t', ' ')
+        .replaceAll('\r', ' ')
+        .replaceAll('\n', ' ');
+  }
+
+  String _guestNamesText(Map<String, dynamic> data) {
+    final guestNamesRaw = data['guestNames'];
+    if (guestNamesRaw is List) {
+      final names =
+          guestNamesRaw
+              .map((e) => e?.toString().trim() ?? '')
+              .where((e) => e.isNotEmpty)
+              .toList();
+      return names.join(', ');
+    }
+    return '';
+  }
+
   Future<void> _copyUserDetails(
     BuildContext context,
     Map<String, dynamic> data,
   ) async {
-    final buffer = StringBuffer();
-    buffer.writeln('Form Number: ${data['formSerialNumber'] ?? 'N/A'}');
-    buffer.writeln('Name: ${data['name'] ?? 'N/A'}');
-    buffer.writeln('Occupation: ${data['occupation'] ?? 'N/A'}');
-    buffer.writeln('Blood Group: ${data['bloodGroup'] ?? 'N/A'}');
-    buffer.writeln('Mobile: ${data['mobile'] ?? 'N/A'}');
-    buffer.writeln('Present Address: ${data['presentAddress'] ?? 'N/A'}');
+    final int guestCount =
+        (data['spouseCount'] ?? 0) + (data['childCount'] ?? 0);
+    final guestNames = _guestNamesText(data);
 
-    final textToCopy = buffer.toString();
+    // Excel-friendly TSV (header + single row)
+    final header = [
+      'Name',
+      'Phone',
+      'Tshirt Size',
+      'Guest',
+      'Guest Names',
+    ].join('\t');
+    final row = [
+      _sanitizeCellValue(data['name'] ?? 'N/A'),
+      _sanitizeCellValue(data['mobile'] ?? 'N/A'),
+      _sanitizeCellValue(data['tshirtSize'] ?? 'N/A'),
+      _sanitizeCellValue(guestCount),
+      _sanitizeCellValue(guestNames),
+    ].join('\t');
+    final textToCopy = '$header\n$row';
+
     await Clipboard.setData(ClipboardData(text: textToCopy));
 
     if (context.mounted) {
@@ -294,29 +328,27 @@ class _ApprovedBatchDetailsPage extends StatelessWidget {
     List<QueryDocumentSnapshot> regs,
   ) async {
     final buffer = StringBuffer();
-    buffer.writeln('═══════════════════════════════════════════════════');
-    buffer.writeln('APPROVED USERS - BATCH: $batchId');
-    buffer.writeln('═══════════════════════════════════════════════════');
-    buffer.writeln('Total Users: ${regs.length}');
-    buffer.writeln('');
-    buffer.writeln('═══════════════════════════════════════════════════');
-    buffer.writeln('');
+    // Excel-friendly TSV: header row + one row per user
+    buffer.writeln(
+      ['Name', 'Phone', 'Tshirt Size', 'Guest', 'Guest Names'].join('\t'),
+    );
 
     for (int i = 0; i < regs.length; i++) {
       final reg = regs[i];
       final data = reg.data() as Map<String, dynamic>;
+      final int guestCount =
+          (data['spouseCount'] ?? 0) + (data['childCount'] ?? 0);
+      final guestNames = _guestNamesText(data);
 
       buffer.writeln(
-        '${i + 1}. Form Number: ${data['formSerialNumber'] ?? 'N/A'}',
+        [
+          _sanitizeCellValue(data['name'] ?? 'N/A'),
+          _sanitizeCellValue(data['mobile'] ?? 'N/A'),
+          _sanitizeCellValue(data['tshirtSize'] ?? 'N/A'),
+          _sanitizeCellValue(guestCount),
+          _sanitizeCellValue(guestNames),
+        ].join('\t'),
       );
-      buffer.writeln('   Name: ${data['name'] ?? 'N/A'}');
-      buffer.writeln('   Occupation: ${data['occupation'] ?? 'N/A'}');
-      buffer.writeln('   Blood Group: ${data['bloodGroup'] ?? 'N/A'}');
-      buffer.writeln('   Mobile: ${data['mobile'] ?? 'N/A'}');
-      buffer.writeln('   Present Address: ${data['presentAddress'] ?? 'N/A'}');
-      buffer.writeln('');
-      buffer.writeln('─────────────────────────────────────────────────');
-      buffer.writeln('');
     }
 
     final textToCopy = buffer.toString();
